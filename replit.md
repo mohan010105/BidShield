@@ -1,10 +1,11 @@
-# [Project name]
+# BidShield
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Evidence-first procurement analytics for reviewing statistical bidding indicators without asserting wrongdoing.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/bidshield run dev` — run the BidShield web app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,23 +23,32 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/bidshield` — React/Vite dashboard and route-level screens
+- `artifacts/api-server` — Express routes and procurement data services
+- `lib/api-spec/openapi.yaml` — source of truth for API contracts
+- `lib/db/src/schema/bidshield.ts` — PostgreSQL schema for procurement and import lineage
+- `artifacts/api-server/src/lib/bidshieldData.ts` — synthetic demo data plus CSV normalization/validation helpers
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Screening levels are descriptive review signals only; the UI repeats the legal-safety disclaimer on relevant surfaces.
+- Synthetic data is generated deterministically so dashboard counts and relationship views remain stable for demos.
+- CSV upload keeps original values next to normalized fields and separates validation, cleaning, and entity resolution steps.
+- The OpenAPI document is the contract for both Express responses and generated React Query hooks.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+BidShield helps procurement investigators browse tenders and companies, inspect participation patterns, manage investigations, upload procurement CSVs, validate and normalize source data, and review suggested company matches.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+No project-specific preferences recorded.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run API codegen after changing `lib/api-spec/openapi.yaml`.
+- Workflow-provided `PORT` and `BASE_PATH` are required by the Vite config for a direct production build.
+- The current demo dataset is synthetic and must not be presented as real-world evidence.
 
 ## Pointers
 

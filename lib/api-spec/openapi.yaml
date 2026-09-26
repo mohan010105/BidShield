@@ -3,13 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Evidence-first procurement analytics API for BidShield
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard summaries
+  - name: tenders
+    description: Procurement tenders
+  - name: companies
+    description: Bidder companies
+  - name: investigations
+    description: Investigation workspaces
+  - name: network
+    description: Participation relationships
+  - name: data
+    description: Procurement data ingestion
 paths:
   /healthz:
     get:
@@ -24,7 +36,374 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /tenders:
+    get:
+      operationId: getTenders
+      tags: [tenders]
+      summary: List tenders
+      parameters:
+        - $ref: "#/components/parameters/SearchParam"
+        - $ref: "#/components/parameters/CategoryParam"
+        - $ref: "#/components/parameters/StateParam"
+        - $ref: "#/components/parameters/ScreeningParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: Tender list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenderList"
+  /tenders/{id}:
+    get:
+      operationId: getTender
+      tags: [tenders]
+      summary: Get tender details
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Tender details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenderDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /companies:
+    get:
+      operationId: getCompanies
+      tags: [companies]
+      summary: List companies
+      parameters:
+        - $ref: "#/components/parameters/SearchParam"
+        - $ref: "#/components/parameters/StateParam"
+        - $ref: "#/components/parameters/ScreeningParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: Company list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyList"
+  /companies/{id}:
+    get:
+      operationId: getCompany
+      tags: [companies]
+      summary: Get company details
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Company details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /investigations:
+    get:
+      operationId: getInvestigations
+      tags: [investigations]
+      summary: List investigation workspaces
+      responses:
+        "200":
+          description: Investigation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Investigation"
+  /investigations/{id}:
+    get:
+      operationId: getInvestigation
+      tags: [investigations]
+      summary: Get investigation details
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Investigation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestigationDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /network:
+    get:
+      operationId: getNetwork
+      tags: [network]
+      summary: Get bidder participation network
+      responses:
+        "200":
+          description: Participation network
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkGraph"
+  /data/upload:
+    post:
+      operationId: uploadData
+      tags: [data]
+      summary: Upload a procurement CSV for preview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataUploadInput"
+      responses:
+        "200":
+          description: Uploaded dataset preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetPreview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /data/validate:
+    post:
+      operationId: validateData
+      tags: [data]
+      summary: Validate an uploaded dataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataValidationInput"
+      responses:
+        "200":
+          description: Validation report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationReport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /data/clean:
+    post:
+      operationId: cleanData
+      tags: [data]
+      summary: Clean and normalize uploaded records
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataCleanInput"
+      responses:
+        "200":
+          description: Cleaned dataset preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CleanedDataset"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /data/resolve-entities:
+    post:
+      operationId: resolveEntities
+      tags: [data]
+      summary: Resolve company entities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntityResolutionInput"
+      responses:
+        "200":
+          description: Entity resolution suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResolutionResult"
+  /data/import:
+    post:
+      operationId: importData
+      tags: [data]
+      summary: Import a validated dataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataImportInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /data/datasets:
+    get:
+      operationId: getDatasets
+      tags: [data]
+      summary: List imported datasets
+      responses:
+        "200":
+          description: Dataset history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Dataset"
+  /data/datasets/{id}:
+    get:
+      operationId: getDataset
+      tags: [data]
+      summary: Get dataset details
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Dataset details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /data/entities/review:
+    get:
+      operationId: getEntityReview
+      tags: [data]
+      summary: List entity matches needing review
+      responses:
+        "200":
+          description: Entity resolution review queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EntityMatch"
+  /data/entities/{id}/confirm:
+    post:
+      operationId: confirmEntity
+      tags: [data]
+      summary: Confirm an entity match
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Updated entity match
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityMatch"
+  /data/entities/{id}/reject:
+    post:
+      operationId: rejectEntity
+      tags: [data]
+      summary: Reject an entity match
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Updated entity match
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityMatch"
+  /data/entities/create:
+    post:
+      operationId: createEntity
+      tags: [data]
+      summary: Create a new canonical company for an unresolved entity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntityCreateInput"
+      responses:
+        "201":
+          description: Created entity match
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityMatch"
 components:
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    SearchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+    CategoryParam:
+      name: category
+      in: query
+      schema:
+        type: string
+    StateParam:
+      name: state
+      in: query
+      schema:
+        type: string
+    ScreeningParam:
+      name: screening
+      in: query
+      schema:
+        type: string
+        enum: [All, Low, Moderate, Elevated]
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSizeParam:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +412,389 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+      required: [success, error]
+    DashboardSummary:
+      type: object
+      properties:
+        totalTenders: { type: integer }
+        totalCompanies: { type: integer }
+        totalBids: { type: integer }
+        reviewCount: { type: integer }
+        tenderVolume:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        categoryValues:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        stateCounts:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        screeningDistribution:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        recentInvestigations:
+          type: array
+          items: { $ref: "#/components/schemas/Investigation" }
+      required: [totalTenders, totalCompanies, totalBids, reviewCount, tenderVolume, categoryValues, stateCounts, screeningDistribution, recentInvestigations]
+    ChartPoint:
+      type: object
+      properties:
+        label: { type: string }
+        value: { type: number }
+      required: [label, value]
+    ScreeningLevel:
+      type: string
+      enum: [Low, Moderate, Elevated, "Not yet analyzed"]
+    Tender:
+      type: object
+      properties:
+        id: { type: integer }
+        tenderNumber: { type: string }
+        title: { type: string }
+        organization: { type: string }
+        department: { type: string }
+        category: { type: string }
+        location: { type: string }
+        state: { type: string }
+        tenderDate: { type: string, format: date }
+        closingDate: { type: string, format: date }
+        estimatedValue: { type: number }
+        contractValue: { type: ["number", "null"] }
+        bidderCount: { type: integer }
+        winner: { type: ["string", "null"] }
+        screeningLevel: { $ref: "#/components/schemas/ScreeningLevel" }
+        indicatorCount: { type: integer }
+      required: [id, tenderNumber, title, organization, department, category, location, state, tenderDate, closingDate, estimatedValue, bidderCount, screeningLevel, indicatorCount]
+    TenderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Tender" }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+      required: [items, total, page, pageSize]
+    Bid:
+      type: object
+      properties:
+        companyId: { type: integer }
+        companyName: { type: string }
+        bidAmount: { type: number }
+        rank: { type: integer }
+        isWinner: { type: boolean }
+        differenceFromWinner: { type: number }
+      required: [companyId, companyName, bidAmount, rank, isWinner, differenceFromWinner]
+    Evidence:
+      type: object
+      properties:
+        id: { type: integer }
+        indicatorType: { type: string }
+        description: { type: string }
+        metric: { type: string }
+        observedValue: { type: ["string", "null"] }
+        expectedValue: { type: ["string", "null"] }
+        severity: { type: string }
+        confidence: { type: number }
+      required: [id, indicatorType, description, metric, severity, confidence]
+    ScreeningSummary:
+      type: object
+      properties:
+        overall: { $ref: "#/components/schemas/ScreeningLevel" }
+        rotation: { type: ["number", "null"] }
+        coverBid: { type: ["number", "null"] }
+        priceClustering: { type: ["number", "null"] }
+        network: { type: ["number", "null"] }
+        neatLoss: { type: ["number", "null"] }
+      required: [overall, rotation, coverBid, priceClustering, network, neatLoss]
+    TenderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Tender"
+        - type: object
+          properties:
+            bids:
+              type: array
+              items: { $ref: "#/components/schemas/Bid" }
+            screening: { $ref: "#/components/schemas/ScreeningSummary" }
+            evidence:
+              type: array
+              items: { $ref: "#/components/schemas/Evidence" }
+          required: [bids, screening, evidence]
+    Company:
+      type: object
+      properties:
+        id: { type: integer }
+        canonicalName: { type: string }
+        normalizedName: { type: string }
+        address: { type: ["string", "null"] }
+        state: { type: ["string", "null"] }
+        tendersParticipated: { type: integer }
+        wins: { type: integer }
+        winRate: { type: number }
+        coParticipants: { type: integer }
+        screeningLevel: { $ref: "#/components/schemas/ScreeningLevel" }
+      required: [id, canonicalName, normalizedName, tendersParticipated, wins, winRate, coParticipants, screeningLevel]
+    CompanyList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Company" }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+      required: [items, total, page, pageSize]
+    CompanyDetail:
+      allOf:
+        - $ref: "#/components/schemas/Company"
+        - type: object
+          properties:
+            aliases:
+              type: array
+              items: { type: string }
+            gstin: { type: ["string", "null"] }
+            registrationNumber: { type: ["string", "null"] }
+            losses: { type: integer }
+            totalBidValue: { type: number }
+            participationOverTime:
+              type: array
+              items: { $ref: "#/components/schemas/ChartPoint" }
+            winsOverTime:
+              type: array
+              items: { $ref: "#/components/schemas/ChartPoint" }
+            frequentCoParticipants:
+              type: array
+              items: { $ref: "#/components/schemas/Company" }
+          required: [aliases, losses, totalBidValue, participationOverTime, winsOverTime, frequentCoParticipants]
+    Investigation:
+      type: object
+      properties:
+        id: { type: integer }
+        tenderId: { type: integer }
+        tenderNumber: { type: string }
+        title: { type: string }
+        screeningLevel: { $ref: "#/components/schemas/ScreeningLevel" }
+        indicatorCount: { type: integer }
+        lastAnalyzed: { type: ["string", "null"], format: date-time }
+        status:
+          type: string
+          enum: [New, "Under Review", Reviewed]
+      required: [id, tenderId, tenderNumber, title, screeningLevel, indicatorCount, status]
+    InvestigationDetail:
+      allOf:
+        - $ref: "#/components/schemas/Investigation"
+        - type: object
+          properties:
+            tender: { $ref: "#/components/schemas/TenderDetail" }
+            notes: { type: ["string", "null"] }
+            relationships:
+              type: array
+              items: { $ref: "#/components/schemas/NetworkEdge" }
+          required: [tender, relationships]
+    NetworkNode:
+      type: object
+      properties:
+        id: { type: integer }
+        label: { type: string }
+        participationCount: { type: integer }
+        x: { type: number }
+        y: { type: number }
+      required: [id, label, participationCount, x, y]
+    NetworkEdge:
+      type: object
+      properties:
+        source: { type: integer }
+        target: { type: integer }
+        sharedTenderCount: { type: integer }
+      required: [source, target, sharedTenderCount]
+    NetworkGraph:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items: { $ref: "#/components/schemas/NetworkNode" }
+        edges:
+          type: array
+          items: { $ref: "#/components/schemas/NetworkEdge" }
+      required: [nodes, edges]
+    DataUploadInput:
+      type: object
+      properties:
+        filename: { type: string, minLength: 1 }
+        content: { type: string, minLength: 1 }
+      required: [filename, content]
+    DataValidationInput:
+      type: object
+      properties:
+        filename: { type: string }
+        headers:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: string }
+        mapping:
+          type: object
+          additionalProperties: { type: ["string", "null"] }
+      required: [filename, headers, rows, mapping]
+    DataCleanInput:
+      allOf:
+        - $ref: "#/components/schemas/DataValidationInput"
+    EntityResolutionInput:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: ["string", "number", "boolean", "null"] }
+      required: [rows]
+    DataImportInput:
+      type: object
+      properties:
+        filename: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: ["string", "number", "boolean", "null"] }
+        mapping:
+          type: object
+          additionalProperties: { type: ["string", "null"] }
+      required: [filename, rows, mapping]
+    DatasetPreview:
+      type: object
+      properties:
+        filename: { type: string }
+        headers:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: string }
+        rowCount: { type: integer }
+        columnCount: { type: integer }
+        mapping:
+          type: object
+          additionalProperties: { type: ["string", "null"] }
+      required: [filename, headers, rows, rowCount, columnCount, mapping]
+    ValidationIssue:
+      type: object
+      properties:
+        row: { type: integer }
+        code: { type: string }
+        message: { type: string }
+        severity:
+          type: string
+          enum: [warning, error]
+      required: [row, code, message, severity]
+    ValidationReport:
+      type: object
+      properties:
+        rows: { type: integer }
+        validRows: { type: integer }
+        warningRows: { type: integer }
+        errorRows: { type: integer }
+        duplicates: { type: integer }
+        qualityScore: { type: number }
+        issues:
+          type: array
+          items: { $ref: "#/components/schemas/ValidationIssue" }
+      required: [rows, validRows, warningRows, errorRows, duplicates, qualityScore, issues]
+    CleanedDataset:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: ["string", "number", "boolean", "null"] }
+        previewRows:
+          type: array
+          items:
+            type: object
+            additionalProperties: { type: ["string", "number", "boolean", "null"] }
+        normalizationNotes:
+          type: array
+          items: { type: string }
+      required: [rows, previewRows, normalizationNotes]
+    EntityMatch:
+      type: object
+      properties:
+        id: { type: integer }
+        sourceName: { type: string }
+        suggestedCompany: { type: ["string", "null"] }
+        confidence: { type: number }
+        status:
+          type: string
+          enum: [AUTO_MATCHED, REVIEW_REQUIRED, CONFIRMED, REJECTED, UNRESOLVED]
+        nameSimilarity: { type: number }
+        addressSimilarity: { type: ["number", "null"] }
+        source: { type: string }
+      required: [id, sourceName, suggestedCompany, confidence, status, nameSimilarity, source]
+    EntityResolutionResult:
+      type: object
+      properties:
+        matches:
+          type: array
+          items: { $ref: "#/components/schemas/EntityMatch" }
+        resolvedCount: { type: integer }
+        reviewCount: { type: integer }
+        unresolvedCount: { type: integer }
+      required: [matches, resolvedCount, reviewCount, unresolvedCount]
+    EntityCreateInput:
+      type: object
+      properties:
+        sourceName: { type: string, minLength: 1 }
+        canonicalName: { type: string, minLength: 1 }
+      required: [sourceName, canonicalName]
+    Dataset:
+      type: object
+      properties:
+        id: { type: integer }
+        filename: { type: string }
+        source: { type: string }
+        uploadedAt: { type: string, format: date-time }
+        totalRows: { type: integer }
+        qualityScore: { type: number }
+        status:
+          type: string
+          enum: [Uploaded, Validating, Ready, Imported, Failed]
+        companies: { type: integer }
+        tenders: { type: integer }
+      required: [id, filename, source, uploadedAt, totalRows, qualityScore, status, companies, tenders]
+    DatasetDetail:
+      allOf:
+        - $ref: "#/components/schemas/Dataset"
+        - type: object
+          properties:
+            validRows: { type: integer }
+            warningRows: { type: integer }
+            errorRows: { type: integer }
+            errors:
+              type: array
+              items: { $ref: "#/components/schemas/ValidationIssue" }
+          required: [validRows, warningRows, errorRows, errors]
+    ImportResult:
+      type: object
+      properties:
+        dataset: { $ref: "#/components/schemas/Dataset" }
+        processedRows: { type: integer }
+        importedRows: { type: integer }
+        warnings: { type: integer }
+        errors: { type: integer }
+        companiesResolved: { type: integer }
+        companiesCreated: { type: integer }
+      required: [dataset, processedRows, importedRows, warnings, errors, companiesResolved, companiesCreated]
 

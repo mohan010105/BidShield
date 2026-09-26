@@ -1,0 +1,1 @@
+- [Generated client TypeScript](generated-client-typescript.md) — API client builds may need DOM iterable types when generated fetch helpers use Headers.entries().

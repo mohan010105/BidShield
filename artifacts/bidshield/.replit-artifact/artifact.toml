@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "BidShield"
+description = "An evidence-first procurement analytics platform that helps investigators review statistical bidding indicators without asserting wrongdoing."
+version = "1.0.0"
+id = "artifacts/bidshield"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26162
+
+[services.development]
+run = "pnpm --filter @workspace/bidshield run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bidshield", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/bidshield/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26162"
+BASE_PATH = "/"

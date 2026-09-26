@@ -1,0 +1,907 @@
+Build Phase 1 of a production-quality full-stack web application called **BidShield** for the hackathon problem statement:
+
+**PS-09-S1 — Detecting Bid Rigging in Public Procurement**
+
+## 1. PROJECT PURPOSE
+
+BidShield is an evidence-first procurement analytics platform that analyzes public procurement/tender data and identifies statistical indicators that may require further investigation for potentially coordinated bidding.
+
+IMPORTANT FRAMING:
+The application must NEVER claim that a company or tender has committed bid rigging, corruption, fraud, or collusion. Statistical indicators are screening signals only. The UI must clearly state:
+
+"Screening results identify statistical indicators for further review. They do not establish collusion, wrongdoing, or legal liability."
+
+This limitation must be designed into the application UI, not hidden only in the footer.
+
+Phase 1 is ONLY the application foundation. Do NOT implement the final bid-rigging detection algorithms yet.
+
+---
+
+# 2. TECHNOLOGY STACK
+
+Use:
+
+Frontend:
+
+* React
+* Vite
+* TypeScript
+* Tailwind CSS
+* React Router
+* Lucide React icons
+* Recharts where useful
+
+Backend:
+
+* Node.js
+* Express
+* TypeScript
+
+Database:
+
+* PostgreSQL
+* Use environment variables for database credentials.
+
+Analytics will be added in later phases using Python, pandas, NumPy, scikit-learn, NetworkX and RapidFuzz.
+
+Do NOT introduce unnecessary microservices, Kubernetes, Docker orchestration, or complicated infrastructure in Phase 1.
+
+The project must remain easy to migrate from Replit to GitHub and later to Antigravity.
+
+---
+
+# 3. PROJECT STRUCTURE
+
+Create a clean modular structure similar to:
+
+bidshield/
+├── client/
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       ├── layouts/
+│       ├── charts/
+│       ├── api/
+│       ├── hooks/
+│       ├── types/
+│       └── utils/
+│
+├── server/
+│   ├── routes/
+│   ├── controllers/
+│   ├── services/
+│   ├── middleware/
+│   ├── models/
+│   └── utils/
+│
+├── analytics/
+│   ├── ingestion/
+│   ├── cleaning/
+│   ├── entity_resolution/
+│   ├── screens/
+│   ├── scoring/
+│   └── network/
+│
+├── database/
+│   ├── schema/
+│   └── seed/
+│
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   └── sample/
+│
+├── shared/
+│   └── types/
+│
+├── README.md
+└── .env.example
+
+Keep frontend, backend, analytics, database and shared types logically separated.
+
+---
+
+# 4. DATABASE DESIGN
+
+Create the initial PostgreSQL schema.
+
+Do NOT put everything into one table.
+
+Create these tables:
+
+## companies
+
+Fields:
+
+* id
+* canonical_name
+* normalized_name
+* address
+* city
+* state
+* gstin
+* registration_number
+* created_at
+* updated_at
+
+## company_aliases
+
+Fields:
+
+* id
+* company_id
+* alias_name
+* alias_type
+* confidence
+* source
+* created_at
+
+This will later support entity resolution because the same company may appear under multiple spellings.
+
+## tenders
+
+Fields:
+
+* id
+* tender_number
+* title
+* department
+* organization
+* category
+* location
+* tender_date
+* closing_date
+* estimated_value
+* contract_value
+* winner_id
+* status
+* source
+* created_at
+* updated_at
+
+## bids
+
+Fields:
+
+* id
+* tender_id
+* company_id
+* bid_amount
+* bid_rank
+* is_winner
+* submission_date
+* technical_score
+* financial_score
+* created_at
+
+## tender_participants
+
+Fields:
+
+* id
+* tender_id
+* company_id
+* participated
+* created_at
+
+## risk_scores
+
+Fields:
+
+* id
+* tender_id
+* company_id
+* group_id
+* rotation_score
+* cover_bid_score
+* price_cluster_score
+* network_score
+* neat_loss_score
+* overall_score
+* risk_level
+* created_at
+* updated_at
+
+The detection algorithms will be implemented later. For Phase 1, these fields can contain null/default values.
+
+## evidence
+
+Fields:
+
+* id
+* risk_score_id
+* indicator_type
+* description
+* metric
+* observed_value
+* expected_value
+* confidence
+* severity
+* created_at
+
+## investigation_reports
+
+Fields:
+
+* id
+* tender_id
+* generated_summary
+* screening_level
+* created_at
+
+Add appropriate primary keys, foreign keys, indexes and timestamps.
+
+Use proper database constraints.
+
+---
+
+# 5. SAMPLE DATA
+
+Create a realistic synthetic procurement dataset for development/demo purposes.
+
+Generate:
+
+* at least 50 companies
+* at least 100 tenders
+* multiple bids per tender
+* multiple categories
+* multiple Indian states
+* multiple departments
+* realistic Indian rupee bid amounts
+* tender dates distributed across multiple months
+* repeated bidder participation
+
+Include intentionally generated patterns that will later allow us to test:
+
+* repeated bidder groups
+* repeated winners
+* alternating winners
+* similar bid amounts
+* repeated losing bidders
+
+IMPORTANT:
+Clearly label this as synthetic/demo data. Do not present synthetic patterns as real-world evidence.
+
+Seed the database with this data.
+
+---
+
+# 6. APPLICATION ROUTES
+
+Create React routes for:
+
+/dashboard
+
+/tenders
+
+/tenders/:id
+
+/companies
+
+/companies/:id
+
+/investigations
+
+/network
+
+/data
+
+/settings
+
+Also create a 404 page.
+
+Every page should currently be functional visually even if some analytics features are placeholders.
+
+---
+
+# 7. APPLICATION LAYOUT
+
+Create a professional desktop-first investigation dashboard.
+
+Layout:
+
+LEFT SIDEBAR
+
+* BidShield logo/name
+* Dashboard
+* Tenders
+* Companies
+* Investigations
+* Network
+* Data
+* Settings
+
+TOP HEADER
+
+* Page title
+* Search
+* Notifications placeholder
+* User/profile placeholder
+
+MAIN CONTENT
+
+* Responsive content area
+
+Use a clean professional visual language appropriate for government procurement analytics.
+
+Avoid excessive gradients, flashy animations, gaming-style UI, or unnecessary visual effects.
+
+Use cards, tables, charts, badges and evidence panels.
+
+---
+
+# 8. DASHBOARD
+
+Build the initial dashboard using seeded data.
+
+Display:
+
+### KPI cards
+
+* Total Tenders
+* Total Companies
+* Total Bids
+* Tenders Requiring Review
+
+Do NOT label these as confirmed fraudulent tenders.
+
+Use wording such as:
+
+"Indicators Requiring Review"
+
+instead of:
+
+"Fraudulent Tenders"
+
+### Charts
+
+Create placeholder/initial charts using the seeded data:
+
+* Tender volume over time
+* Procurement value by category
+* Tenders by state
+* Screening-level distribution
+
+Use Recharts.
+
+### Recent investigations
+
+Create a table:
+
+* Tender ID
+* Title
+* Organization
+* Value
+* Screening Level
+* Indicators
+* Action
+
+For Phase 1, screening levels may be generated from seeded placeholder data.
+
+---
+
+# 9. TENDERS PAGE
+
+Create a searchable/filterable tender table.
+
+Columns:
+
+* Tender ID
+* Tender Title
+* Organization
+* Category
+* State
+* Estimated Value
+* Number of Bidders
+* Winner
+* Screening Level
+* Action
+
+Add:
+
+* Search
+* Category filter
+* State filter
+* Screening-level filter
+* Date filter placeholder
+* Pagination
+
+Clicking a tender should open:
+
+/tenders/:id
+
+---
+
+# 10. TENDER DETAILS PAGE
+
+Create the complete visual structure even though advanced analytics are not implemented yet.
+
+Sections:
+
+### Tender Overview
+
+* Tender number
+* Title
+* Organization
+* Department
+* Category
+* Location
+* Tender date
+* Closing date
+* Estimated value
+* Contract value
+
+### Bidders
+
+Table:
+
+* Company
+* Bid amount
+* Rank
+* Winner
+* Difference from winner
+
+### Screening Summary
+
+Display:
+
+* Overall screening level
+* Rotation indicator
+* Cover-bid indicator
+* Price-clustering indicator
+* Network indicator
+* Neat-loss indicator
+
+For now use "Not yet analyzed" or clearly marked demo values where appropriate.
+
+### Evidence section
+
+Create the UI for evidence cards:
+
+* Indicator type
+* Explanation
+* Observed value
+* Expected/reference value
+* Severity
+* Confidence
+
+Do NOT fabricate evidence for real data.
+
+### Required disclaimer
+
+Place prominently:
+
+"Screening results identify statistical indicators for further review. They do not establish collusion, wrongdoing, or legal liability."
+
+---
+
+# 11. COMPANIES PAGE
+
+Create a company directory.
+
+Columns:
+
+* Company
+* State
+* Tenders Participated
+* Wins
+* Win Rate
+* Co-participating Companies
+* Screening Level
+
+Create search and filters.
+
+Click a company to:
+
+/companies/:id
+
+---
+
+# 12. COMPANY DETAILS PAGE
+
+Create:
+
+### Company Profile
+
+* Canonical company name
+* Known aliases
+* Address
+* State
+* GSTIN/registration number if available in synthetic data
+
+### Procurement Activity
+
+* Tenders participated
+* Wins
+* Losses
+* Win rate
+* Total bid value
+
+### Historical Activity
+
+Create chart placeholders for:
+
+* participation over time
+* wins over time
+* bid amounts
+
+### Frequent Co-participants
+
+Show companies that repeatedly appear in the same tenders.
+
+This is descriptive only in Phase 1.
+
+---
+
+# 13. INVESTIGATIONS PAGE
+
+Create an investigation workspace.
+
+Show:
+
+* Tender
+* Screening level
+* Number of indicators
+* Last analyzed date
+* Status
+
+Statuses:
+
+* New
+* Under Review
+* Reviewed
+
+Allow the user to open an investigation.
+
+Create a detailed investigation layout containing:
+
+* Tender information
+* Screening indicators
+* Evidence
+* Bidder relationships
+* Historical patterns
+* Investigator notes placeholder
+
+---
+
+# 14. NETWORK PAGE
+
+Create the UI foundation for the bidder participation network.
+
+For Phase 1:
+
+* Build a graph visualization component using appropriate React-compatible graph technology.
+* Nodes represent companies.
+* Edges represent shared tender participation.
+* Node size can represent participation count.
+* Edge thickness can represent co-participation count.
+
+Use seeded data.
+
+Do NOT claim that a connected cluster represents collusion.
+
+Add this text:
+
+"Network relationships represent observed participation patterns only and should not be interpreted as evidence of collusion by themselves."
+
+---
+
+# 15. DATA PAGE
+
+Create the future data ingestion interface.
+
+Sections:
+
+### Upload Procurement Data
+
+* Drag-and-drop area
+* CSV upload
+* Excel upload placeholder
+* File validation placeholder
+
+### Dataset Preview
+
+Show:
+
+* filename
+* rows
+* columns
+* detected fields
+* validation status
+
+### Column Mapping
+
+Prepare UI for mapping:
+
+Tender ID
+Bidder Name
+Bid Amount
+Winner
+Tender Date
+Department
+Category
+Location
+
+Do not implement advanced ingestion yet.
+
+The backend should have a basic upload endpoint structure ready for Phase 2.
+
+---
+
+# 16. API STRUCTURE
+
+Create Express API structure.
+
+Example:
+
+GET /api/dashboard/summary
+
+GET /api/tenders
+
+GET /api/tenders/:id
+
+GET /api/companies
+
+GET /api/companies/:id
+
+GET /api/investigations
+
+GET /api/investigations/:id
+
+GET /api/network
+
+GET /api/data/datasets
+
+POST /api/data/upload
+
+Create controllers and services separately.
+
+Do not put all business logic inside route files.
+
+Return consistent JSON responses.
+
+Example:
+
+{
+"success": true,
+"data": {}
+}
+
+For errors:
+
+{
+"success": false,
+"error": {
+"message": "..."
+}
+}
+
+---
+
+# 17. SECURITY AND CONFIGURATION
+
+Use environment variables.
+
+Create:
+
+.env.example
+
+Include placeholders for:
+
+DATABASE_URL
+PORT
+CLIENT_URL
+
+Never hardcode secrets.
+
+Do not commit .env.
+
+Add .gitignore.
+
+Validate environment configuration during server startup.
+
+---
+
+# 18. ERROR HANDLING
+
+Implement:
+
+* global Express error middleware
+* API error responses
+* frontend error states
+* loading states
+* empty states
+* 404 handling
+* database connection error handling
+
+Do not show raw stack traces to users.
+
+---
+
+# 19. UI REQUIREMENTS
+
+The application should look like a serious investigation/analytics product.
+
+Use:
+
+* professional typography
+* consistent spacing
+* clear hierarchy
+* responsive tables
+* cards
+* badges
+* charts
+* tooltips
+* evidence panels
+* accessible buttons
+* clear hover states
+
+Use icons consistently.
+
+Create reusable components:
+
+* Sidebar
+* Header
+* KPI Card
+* DataTable
+* StatusBadge
+* RiskBadge
+* EvidenceCard
+* EmptyState
+* LoadingState
+* SearchBar
+* FilterBar
+* ChartCard
+* DisclaimerBanner
+
+---
+
+# 20. IMPORTANT PRODUCT LANGUAGE
+
+Never use wording such as:
+
+"Confirmed collusion"
+"Criminal company"
+"Fraud detected"
+"Corrupt bidder"
+"Company is cheating"
+
+Instead use:
+
+"Indicator detected"
+"Requires further review"
+"Elevated screening level"
+"Potentially unusual bidding pattern"
+"Statistical indicator"
+"Observed participation pattern"
+
+This language must be used throughout the UI.
+
+---
+
+# 21. FUTURE-PHASE ARCHITECTURE
+
+Prepare the code so future phases can add:
+
+Phase 2:
+Data ingestion + validation
+
+Phase 3:
+Entity resolution
+
+Phase 4:
+Winner rotation detection
+
+Phase 5:
+Cover-bid detection
+
+Phase 6:
+Price clustering
+
+Phase 7:
+Participation network analytics
+
+Phase 8:
+Neat-loss analysis
+
+Phase 9:
+Risk scoring
+
+Phase 10:
+Evidence engine
+
+Phase 11:
+AI-assisted evidence summarization
+
+Phase 12:
+Investigation reports
+
+Do NOT implement these advanced algorithms now.
+
+Create clear service interfaces/placeholders where needed.
+
+---
+
+# 22. DEVELOPMENT QUALITY
+
+Before finishing Phase 1:
+
+1. Install dependencies.
+2. Start frontend.
+3. Start backend.
+4. Connect PostgreSQL.
+5. Run migrations/schema.
+6. Seed database.
+7. Verify all routes.
+8. Verify API endpoints.
+9. Verify dashboard loads.
+10. Verify tender details work.
+11. Verify company details work.
+12. Verify network page loads.
+13. Verify data page loads.
+14. Fix TypeScript errors.
+15. Fix console errors.
+16. Fix broken imports.
+17. Ensure no hardcoded secrets.
+18. Ensure the project can be pushed to GitHub.
+
+Do not stop after creating files. Actually run and test the application.
+
+---
+
+# 23. GIT READINESS
+
+Create a clean README containing:
+
+* Project name
+* Problem statement
+* Current Phase
+* Technology stack
+* Architecture
+* Local development instructions
+* Environment variables
+* Database setup
+* Project structure
+* Future roadmap
+
+The repository must be easy to move from Replit to GitHub and later to another development environment such as Antigravity.
+
+---
+
+# 24. FINAL PHASE 1 DEFINITION OF DONE
+
+Phase 1 is complete only when:
+
+✓ React application runs
+✓ Express server runs
+✓ PostgreSQL connects
+✓ Database schema exists
+✓ Synthetic dataset is seeded
+✓ Dashboard works
+✓ Tender list works
+✓ Tender details work
+✓ Company list works
+✓ Company details work
+✓ Investigation UI works
+✓ Network UI works
+✓ Data upload UI exists
+✓ API structure exists
+✓ Responsive layout works
+✓ Error handling exists
+✓ Required disclaimers are visible
+✓ No secrets are hardcoded
+✓ README exists
+✓ No major TypeScript/runtime errors remain
+
+IMPORTANT:
+Do not implement the full bid-rigging detection engine in this phase.
+
+Build a strong, clean, extensible foundation that we can extend phase-by-phase.
+After implementation, provide a concise summary of:
+
+1. Files created
+2. Database tables created
+3. API endpoints created
+4. Features completed
+5. Features intentionally deferred to Phase 2+
+6. Any remaining errors or setup requirements
