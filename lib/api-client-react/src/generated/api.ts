@@ -20,10 +20,15 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AnalyticsEvidence,
+  AnalyticsIndicator,
   BadRequestResponse,
   CleanedDataset,
   CompanyDetail,
   CompanyList,
+  CompanyPatterns,
+  CompanyPricePatterns,
+  CoverBidList,
   DashboardSummary,
   DataCleanInput,
   DataImportInput,
@@ -44,6 +49,11 @@ import type {
   InvestigationDetail,
   NetworkGraph,
   NotFoundResponse,
+  PriceClusteringList,
+  RecalculateInput,
+  RecalculateResult,
+  RotationList,
+  TenderAnalytics,
   TenderDetail,
   TenderList,
   ValidationReport
@@ -783,6 +793,935 @@ export function useGetNetwork<TData = Awaited<ReturnType<typeof getNetwork>>, TE
 
 
 
+
+export const getAnalyzeTenderUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/tenders/${id}/analyze`
+}
+
+/**
+ * @summary Analyze one tender with the enabled screening engines
+ */
+export const analyzeTender = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<TenderAnalytics> => {
+
+  return customFetch<TenderAnalytics>(getAnalyzeTenderUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAnalyzeTenderMutationKey = () => ['analyzeTender'] as const;
+
+export const getAnalyzeTenderMutationOptions = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeTender>>, TError,AnalyzeTenderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeTender>>, TError,AnalyzeTenderMutationVariables, TContext> => {
+
+const mutationKey = getAnalyzeTenderMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeTender>>, AnalyzeTenderMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  analyzeTender(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeTenderMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeTender>>>
+
+    export type AnalyzeTenderMutationError = ErrorType<NotFoundResponse>
+    export type AnalyzeTenderMutationVariables = {id: number}
+
+    /**
+ * @summary Analyze one tender with the enabled screening engines
+ */
+export const useAnalyzeTender = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeTender>>, TError,AnalyzeTenderMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeTender>>,
+        TError,
+        AnalyzeTenderMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAnalyzeTenderMutationOptions(options));
+    }
+
+export const getGetTenderAnalyticsUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/tenders/${id}`
+}
+
+/**
+ * @summary Get cached or calculated tender analytics
+ */
+export const getTenderAnalytics = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<TenderAnalytics> => {
+
+  return customFetch<TenderAnalytics>(getGetTenderAnalyticsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTenderAnalyticsQueryKey = (id: number,) => {
+    return [
+    `/api/analytics/tenders/${id}`
+    ] as const;
+    }
+
+
+export const getGetTenderAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getTenderAnalytics>>, TError = ErrorType<NotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenderAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTenderAnalyticsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTenderAnalytics>>> = ({ signal }) => getTenderAnalytics(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTenderAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTenderAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getTenderAnalytics>>>
+export type GetTenderAnalyticsQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get cached or calculated tender analytics
+ */
+
+export function useGetTenderAnalytics<TData = Awaited<ReturnType<typeof getTenderAnalytics>>, TError = ErrorType<NotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenderAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTenderAnalyticsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTenderAnalyticsEvidenceUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/tenders/${id}/evidence`
+}
+
+/**
+ * @summary Get traceable screening evidence for a tender
+ */
+export const getTenderAnalyticsEvidence = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<AnalyticsEvidence[]> => {
+
+  return customFetch<AnalyticsEvidence[]>(getGetTenderAnalyticsEvidenceUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTenderAnalyticsEvidenceQueryKey = (id: number,) => {
+    return [
+    `/api/analytics/tenders/${id}/evidence`
+    ] as const;
+    }
+
+
+export const getGetTenderAnalyticsEvidenceQueryOptions = <TData = Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>, TError = ErrorType<NotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTenderAnalyticsEvidenceQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>> = ({ signal }) => getTenderAnalyticsEvidence(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTenderAnalyticsEvidenceQueryResult = NonNullable<Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>>
+export type GetTenderAnalyticsEvidenceQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get traceable screening evidence for a tender
+ */
+
+export function useGetTenderAnalyticsEvidence<TData = Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>, TError = ErrorType<NotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenderAnalyticsEvidence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTenderAnalyticsEvidenceQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRotationAnalyticsUrl = () => {
+
+
+
+
+  return `/api/analytics/rotation`
+}
+
+/**
+ * @summary List winner rotation indicators
+ */
+export const getRotationAnalytics = async ( options?: Parameters<typeof customFetch>[1]): Promise<RotationList> => {
+
+  return customFetch<RotationList>(getGetRotationAnalyticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRotationAnalyticsQueryKey = () => {
+    return [
+    `/api/analytics/rotation`
+    ] as const;
+    }
+
+
+export const getGetRotationAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getRotationAnalytics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRotationAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRotationAnalyticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRotationAnalytics>>> = ({ signal }) => getRotationAnalytics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRotationAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRotationAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getRotationAnalytics>>>
+export type GetRotationAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List winner rotation indicators
+ */
+
+export function useGetRotationAnalytics<TData = Awaited<ReturnType<typeof getRotationAnalytics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRotationAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRotationAnalyticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCompanyRotationAnalyticsUrl = (companyId: number,) => {
+
+
+
+
+  return `/api/analytics/rotation/${companyId}`
+}
+
+/**
+ * @summary Get winner rotation history for a company
+ */
+export const getCompanyRotationAnalytics = async (companyId: number, options?: Parameters<typeof customFetch>[1]): Promise<RotationList> => {
+
+  return customFetch<RotationList>(getGetCompanyRotationAnalyticsUrl(companyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompanyRotationAnalyticsQueryKey = (companyId: number,) => {
+    return [
+    `/api/analytics/rotation/${companyId}`
+    ] as const;
+    }
+
+
+export const getGetCompanyRotationAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getCompanyRotationAnalytics>>, TError = ErrorType<unknown>>(companyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyRotationAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyRotationAnalyticsQueryKey(companyId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanyRotationAnalytics>>> = ({ signal }) => getCompanyRotationAnalytics(companyId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: companyId !== null && companyId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompanyRotationAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCompanyRotationAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompanyRotationAnalytics>>>
+export type GetCompanyRotationAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get winner rotation history for a company
+ */
+
+export function useGetCompanyRotationAnalytics<TData = Awaited<ReturnType<typeof getCompanyRotationAnalytics>>, TError = ErrorType<unknown>>(
+ companyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyRotationAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCompanyRotationAnalyticsQueryOptions(companyId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCoverBidAnalyticsUrl = () => {
+
+
+
+
+  return `/api/analytics/cover-bid`
+}
+
+/**
+ * @summary List cover-bid positioning indicators
+ */
+export const getCoverBidAnalytics = async ( options?: Parameters<typeof customFetch>[1]): Promise<CoverBidList> => {
+
+  return customFetch<CoverBidList>(getGetCoverBidAnalyticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCoverBidAnalyticsQueryKey = () => {
+    return [
+    `/api/analytics/cover-bid`
+    ] as const;
+    }
+
+
+export const getGetCoverBidAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getCoverBidAnalytics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCoverBidAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCoverBidAnalyticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCoverBidAnalytics>>> = ({ signal }) => getCoverBidAnalytics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCoverBidAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCoverBidAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getCoverBidAnalytics>>>
+export type GetCoverBidAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List cover-bid positioning indicators
+ */
+
+export function useGetCoverBidAnalytics<TData = Awaited<ReturnType<typeof getCoverBidAnalytics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCoverBidAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCoverBidAnalyticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPriceClusteringAnalyticsUrl = () => {
+
+
+
+
+  return `/api/analytics/price-clustering`
+}
+
+/**
+ * @summary List price clustering indicators
+ */
+export const getPriceClusteringAnalytics = async ( options?: Parameters<typeof customFetch>[1]): Promise<PriceClusteringList> => {
+
+  return customFetch<PriceClusteringList>(getGetPriceClusteringAnalyticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceClusteringAnalyticsQueryKey = () => {
+    return [
+    `/api/analytics/price-clustering`
+    ] as const;
+    }
+
+
+export const getGetPriceClusteringAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceClusteringAnalytics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceClusteringAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceClusteringAnalyticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceClusteringAnalytics>>> = ({ signal }) => getPriceClusteringAnalytics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceClusteringAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceClusteringAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceClusteringAnalytics>>>
+export type GetPriceClusteringAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List price clustering indicators
+ */
+
+export function useGetPriceClusteringAnalytics<TData = Awaited<ReturnType<typeof getPriceClusteringAnalytics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceClusteringAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceClusteringAnalyticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAnalyzeTenderPriceClusteringUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/tenders/${id}/price-clustering`
+}
+
+/**
+ * @summary Run price clustering screening on a tender
+ */
+export const analyzeTenderPriceClustering = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<AnalyticsIndicator> => {
+
+  return customFetch<AnalyticsIndicator>(getAnalyzeTenderPriceClusteringUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAnalyzeTenderPriceClusteringMutationKey = () => ['analyzeTenderPriceClustering'] as const;
+
+export const getAnalyzeTenderPriceClusteringMutationOptions = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeTenderPriceClustering>>, TError,AnalyzeTenderPriceClusteringMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeTenderPriceClustering>>, TError,AnalyzeTenderPriceClusteringMutationVariables, TContext> => {
+
+const mutationKey = getAnalyzeTenderPriceClusteringMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeTenderPriceClustering>>, AnalyzeTenderPriceClusteringMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  analyzeTenderPriceClustering(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeTenderPriceClusteringMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeTenderPriceClustering>>>
+
+    export type AnalyzeTenderPriceClusteringMutationError = ErrorType<NotFoundResponse>
+    export type AnalyzeTenderPriceClusteringMutationVariables = {id: number}
+
+    /**
+ * @summary Run price clustering screening on a tender
+ */
+export const useAnalyzeTenderPriceClustering = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeTenderPriceClustering>>, TError,AnalyzeTenderPriceClusteringMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeTenderPriceClustering>>,
+        TError,
+        AnalyzeTenderPriceClusteringMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAnalyzeTenderPriceClusteringMutationOptions(options));
+    }
+
+export const getGetTenderPriceClusteringUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/tenders/${id}/price-clustering`
+}
+
+/**
+ * @summary Get price clustering screening indicator for a tender
+ */
+export const getTenderPriceClustering = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<AnalyticsIndicator> => {
+
+  return customFetch<AnalyticsIndicator>(getGetTenderPriceClusteringUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTenderPriceClusteringQueryKey = (id: number,) => {
+    return [
+    `/api/analytics/tenders/${id}/price-clustering`
+    ] as const;
+    }
+
+
+export const getGetTenderPriceClusteringQueryOptions = <TData = Awaited<ReturnType<typeof getTenderPriceClustering>>, TError = ErrorType<NotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenderPriceClustering>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTenderPriceClusteringQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTenderPriceClustering>>> = ({ signal }) => getTenderPriceClustering(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTenderPriceClustering>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTenderPriceClusteringQueryResult = NonNullable<Awaited<ReturnType<typeof getTenderPriceClustering>>>
+export type GetTenderPriceClusteringQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get price clustering screening indicator for a tender
+ */
+
+export function useGetTenderPriceClustering<TData = Awaited<ReturnType<typeof getTenderPriceClustering>>, TError = ErrorType<NotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenderPriceClustering>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTenderPriceClusteringQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCompanyPatternsUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/companies/${id}/patterns`
+}
+
+/**
+ * @summary Get historical screening patterns for a company
+ */
+export const getCompanyPatterns = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CompanyPatterns> => {
+
+  return customFetch<CompanyPatterns>(getGetCompanyPatternsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompanyPatternsQueryKey = (id: number,) => {
+    return [
+    `/api/analytics/companies/${id}/patterns`
+    ] as const;
+    }
+
+
+export const getGetCompanyPatternsQueryOptions = <TData = Awaited<ReturnType<typeof getCompanyPatterns>>, TError = ErrorType<NotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyPatterns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyPatternsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanyPatterns>>> = ({ signal }) => getCompanyPatterns(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompanyPatterns>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCompanyPatternsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompanyPatterns>>>
+export type GetCompanyPatternsQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get historical screening patterns for a company
+ */
+
+export function useGetCompanyPatterns<TData = Awaited<ReturnType<typeof getCompanyPatterns>>, TError = ErrorType<NotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyPatterns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCompanyPatternsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCompanyPricePatternsUrl = (id: number,) => {
+
+
+
+
+  return `/api/analytics/companies/${id}/price-patterns`
+}
+
+/**
+ * @summary Get historical price positioning patterns for a company
+ */
+export const getCompanyPricePatterns = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CompanyPricePatterns> => {
+
+  return customFetch<CompanyPricePatterns>(getGetCompanyPricePatternsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompanyPricePatternsQueryKey = (id: number,) => {
+    return [
+    `/api/analytics/companies/${id}/price-patterns`
+    ] as const;
+    }
+
+
+export const getGetCompanyPricePatternsQueryOptions = <TData = Awaited<ReturnType<typeof getCompanyPricePatterns>>, TError = ErrorType<NotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyPricePatterns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyPricePatternsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanyPricePatterns>>> = ({ signal }) => getCompanyPricePatterns(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompanyPricePatterns>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCompanyPricePatternsQueryResult = NonNullable<Awaited<ReturnType<typeof getCompanyPricePatterns>>>
+export type GetCompanyPricePatternsQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get historical price positioning patterns for a company
+ */
+
+export function useGetCompanyPricePatterns<TData = Awaited<ReturnType<typeof getCompanyPricePatterns>>, TError = ErrorType<NotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyPricePatterns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCompanyPricePatternsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRecalculateAnalyticsUrl = () => {
+
+
+
+
+  return `/api/analytics/recalculate`
+}
+
+/**
+ * @summary Recalculate enabled screening indicators
+ */
+export const recalculateAnalytics = async (recalculateInput?: RecalculateInput, options?: Parameters<typeof customFetch>[1]): Promise<RecalculateResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RecalculateResult>(getRecalculateAnalyticsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recalculateInput)
+  }
+);}
+
+
+
+
+
+export const getRecalculateAnalyticsMutationKey = () => ['recalculateAnalytics'] as const;
+
+export const getRecalculateAnalyticsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAnalytics>>, TError,RecalculateAnalyticsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recalculateAnalytics>>, TError,RecalculateAnalyticsMutationVariables, TContext> => {
+
+const mutationKey = getRecalculateAnalyticsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recalculateAnalytics>>, RecalculateAnalyticsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  recalculateAnalytics(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecalculateAnalyticsMutationResult = NonNullable<Awaited<ReturnType<typeof recalculateAnalytics>>>
+    export type RecalculateAnalyticsMutationBody = BodyType<RecalculateInput> | undefined
+    export type RecalculateAnalyticsMutationError = ErrorType<unknown>
+    export type RecalculateAnalyticsMutationVariables = {data?: BodyType<RecalculateInput>}
+
+    /**
+ * @summary Recalculate enabled screening indicators
+ */
+export const useRecalculateAnalytics = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recalculateAnalytics>>, TError,RecalculateAnalyticsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recalculateAnalytics>>,
+        TError,
+        RecalculateAnalyticsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecalculateAnalyticsMutationOptions(options));
+    }
 
 export const getUploadDataUrl = () => {
 

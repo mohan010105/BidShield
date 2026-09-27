@@ -20,6 +20,8 @@ tags:
     description: Investigation workspaces
   - name: network
     description: Participation relationships
+  - name: analytics
+    description: Statistical screening analytics
   - name: data
     description: Procurement data ingestion
 paths:
@@ -159,6 +161,192 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NetworkGraph"
+  /analytics/tenders/{id}/analyze:
+    post:
+      operationId: analyzeTender
+      tags: [analytics]
+      summary: Analyze one tender with the enabled screening engines
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Tender analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenderAnalytics"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /analytics/tenders/{id}:
+    get:
+      operationId: getTenderAnalytics
+      tags: [analytics]
+      summary: Get cached or calculated tender analytics
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Tender analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenderAnalytics"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /analytics/tenders/{id}/evidence:
+    get:
+      operationId: getTenderAnalyticsEvidence
+      tags: [analytics]
+      summary: Get traceable screening evidence for a tender
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Tender screening evidence
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalyticsEvidence"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /analytics/rotation:
+    get:
+      operationId: getRotationAnalytics
+      tags: [analytics]
+      summary: List winner rotation indicators
+      responses:
+        "200":
+          description: Winner rotation indicators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotationList"
+  /analytics/rotation/{companyId}:
+    get:
+      operationId: getCompanyRotationAnalytics
+      tags: [analytics]
+      summary: Get winner rotation history for a company
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Company winner rotation history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotationList"
+  /analytics/cover-bid:
+    get:
+      operationId: getCoverBidAnalytics
+      tags: [analytics]
+      summary: List cover-bid positioning indicators
+      responses:
+        "200":
+          description: Cover-bid indicators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoverBidList"
+  /analytics/price-clustering:
+    get:
+      operationId: getPriceClusteringAnalytics
+      tags: [analytics]
+      summary: List price clustering indicators
+      responses:
+        "200":
+          description: Price clustering indicators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceClusteringList"
+  /analytics/tenders/{id}/price-clustering:
+    post:
+      operationId: analyzeTenderPriceClustering
+      tags: [analytics]
+      summary: Run price clustering screening on a tender
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Price clustering screening result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsIndicator"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      operationId: getTenderPriceClustering
+      tags: [analytics]
+      summary: Get price clustering screening indicator for a tender
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Price clustering indicator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsIndicator"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /analytics/companies/{id}/patterns:
+    get:
+      operationId: getCompanyPatterns
+      tags: [analytics]
+      summary: Get historical screening patterns for a company
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Company screening patterns
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyPatterns"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /analytics/companies/{id}/price-patterns:
+    get:
+      operationId: getCompanyPricePatterns
+      tags: [analytics]
+      summary: Get historical price positioning patterns for a company
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Company price positioning patterns
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyPricePatterns"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /analytics/recalculate:
+    post:
+      operationId: recalculateAnalytics
+      tags: [analytics]
+      summary: Recalculate enabled screening indicators
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecalculateInput"
+      responses:
+        "200":
+          description: Recalculation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecalculateResult"
   /data/upload:
     post:
       operationId: uploadData
@@ -442,7 +630,9 @@ components:
         recentInvestigations:
           type: array
           items: { $ref: "#/components/schemas/Investigation" }
-      required: [totalTenders, totalCompanies, totalBids, reviewCount, tenderVolume, categoryValues, stateCounts, screeningDistribution, recentInvestigations]
+        screeningAnalytics:
+          $ref: "#/components/schemas/ScreeningAnalyticsSummary"
+      required: [totalTenders, totalCompanies, totalBids, reviewCount, tenderVolume, categoryValues, stateCounts, screeningDistribution, recentInvestigations, screeningAnalytics]
     ChartPoint:
       type: object
       properties:
@@ -797,4 +987,254 @@ components:
         companiesResolved: { type: integer }
         companiesCreated: { type: integer }
       required: [dataset, processedRows, importedRows, warnings, errors, companiesResolved, companiesCreated]
+    IndicatorMetric:
+      type: object
+      properties:
+        key: { type: string }
+        label: { type: string }
+        value: { type: number }
+        formatted: { type: string }
+      required: [key, label, value, formatted]
+    ComparisonScope:
+      type: object
+      properties:
+        category: { type: string }
+        organization: { type: string }
+        department: { type: string }
+        geography: { type: string }
+        valueRange: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        comparableTenderCount: { type: integer }
+      required: [category, organization, department, geography, valueRange, startDate, endDate, comparableTenderCount]
+    AnalyticsEvidence:
+      type: object
+      properties:
+        id: { type: integer }
+        indicatorType: { type: string }
+        description: { type: string }
+        metric: { type: string }
+        observedValue: { type: ["string", "null"] }
+        expectedValue: { type: ["string", "null"] }
+        confidence: { type: number }
+        severity: { type: string }
+        supportingTenderIds:
+          type: array
+          items: { type: integer }
+      required: [id, indicatorType, description, metric, observedValue, expectedValue, confidence, severity, supportingTenderIds]
+    AnalyticsIndicator:
+      type: object
+      properties:
+        indicatorType: { type: string }
+        score: { type: ["number", "null"] }
+        status:
+          type: string
+          enum: [LOW INDICATOR, MODERATE INDICATOR, ELEVATED INDICATOR, HIGH INDICATOR, INSUFFICIENT_DATA]
+        methodologyVersion: { type: string }
+        calculatedAt: { type: string, format: date-time }
+        sampleSize: { type: integer }
+        threshold: { type: number }
+        confidence: { type: number }
+        summary: { type: string }
+        metrics:
+          type: array
+          items: { $ref: "#/components/schemas/IndicatorMetric" }
+        evidenceCount: { type: integer }
+      required: [indicatorType, score, status, methodologyVersion, calculatedAt, sampleSize, threshold, confidence, summary, metrics, evidenceCount]
+    TenderAnalytics:
+      type: object
+      properties:
+        tenderId: { type: integer }
+        tenderNumber: { type: string }
+        comparisonScope: { $ref: "#/components/schemas/ComparisonScope" }
+        winnerRotation: { $ref: "#/components/schemas/AnalyticsIndicator" }
+        coverBid: { $ref: "#/components/schemas/AnalyticsIndicator" }
+        priceClustering: { $ref: "#/components/schemas/AnalyticsIndicator" }
+        evidence:
+          type: array
+          items: { $ref: "#/components/schemas/AnalyticsEvidence" }
+        calculatedAt: { type: string, format: date-time }
+      required: [tenderId, tenderNumber, comparisonScope, winnerRotation, coverBid, priceClustering, evidence, calculatedAt]
+    RotationListItem:
+      type: object
+      properties:
+        tenderId: { type: integer }
+        tenderNumber: { type: string }
+        score: { type: ["number", "null"] }
+        status: { type: string }
+        sampleSize: { type: integer }
+        winner: { type: ["string", "null"] }
+        comparisonGroup: { type: string }
+        winnerSequence:
+          type: array
+          items: { type: string }
+      required: [tenderId, tenderNumber, score, status, sampleSize, winner, comparisonGroup, winnerSequence]
+    RotationList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/RotationListItem" }
+        total: { type: integer }
+      required: [items, total]
+    CoverBidListItem:
+      type: object
+      properties:
+        tenderId: { type: integer }
+        tenderNumber: { type: string }
+        score: { type: ["number", "null"] }
+        status: { type: string }
+        sampleSize: { type: integer }
+        comparisonGroup: { type: string }
+        flaggedCompanies:
+          type: array
+          items: { type: string }
+        medianRelativeDistance: { type: number }
+        currentRelativeDistances:
+          type: array
+          items: { type: number }
+      required: [tenderId, tenderNumber, score, status, sampleSize, comparisonGroup, flaggedCompanies, medianRelativeDistance, currentRelativeDistances]
+    CoverBidList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CoverBidListItem" }
+        total: { type: integer }
+      required: [items, total]
+    PriceClusteringListItem:
+      type: object
+      properties:
+        tenderId: { type: integer }
+        tenderNumber: { type: string }
+        score: { type: ["number", "null"] }
+        status: { type: string }
+        sampleSize: { type: integer }
+        comparisonGroup: { type: string }
+        coefficientOfVariation: { type: number }
+        bidSpreadPct: { type: number }
+        cvPercentile: { type: ["number", "null"] }
+        historicalMedianCV: { type: ["number", "null"] }
+        comparableTendersCount: { type: integer }
+      required: [tenderId, tenderNumber, score, status, sampleSize, comparisonGroup, coefficientOfVariation, bidSpreadPct, cvPercentile, historicalMedianCV, comparableTendersCount]
+    PriceClusteringList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PriceClusteringListItem" }
+        total: { type: integer }
+      required: [items, total]
+    CompanyPricePatternObservation:
+      type: object
+      properties:
+        tenderId: { type: integer }
+        tenderNumber: { type: string }
+        tenderDate: { type: string }
+        category: { type: string }
+        bidAmount: { type: number }
+        winningBid: { type: number }
+        relativeDistancePct: { type: number }
+        isWinner: { type: boolean }
+        isRepeatedPosition: { type: boolean }
+      required: [tenderId, tenderNumber, tenderDate, category, bidAmount, winningBid, relativeDistancePct, isWinner, isRepeatedPosition]
+    CompanyPricePatterns:
+      type: object
+      properties:
+        companyId: { type: integer }
+        companyName: { type: string }
+        comparableBidsCount: { type: integer }
+        winningBidsCount: { type: integer }
+        losingBidsCount: { type: integer }
+        averageRelativeDistance: { type: ["number", "null"] }
+        medianRelativeDistance: { type: ["number", "null"] }
+        stdDevRelativeDistance: { type: ["number", "null"] }
+        repeatedPositioningCount: { type: integer }
+        bidPositionHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              value: { type: number }
+              bidAmount: { type: number }
+              winningBid: { type: number }
+              isWinner: { type: boolean }
+            required: [label, value, bidAmount, winningBid, isWinner]
+        positioningDistribution:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        observations:
+          type: array
+          items: { $ref: "#/components/schemas/CompanyPricePatternObservation" }
+      required: [companyId, companyName, comparableBidsCount, winningBidsCount, losingBidsCount, averageRelativeDistance, medianRelativeDistance, stdDevRelativeDistance, repeatedPositioningCount, bidPositionHistory, positioningDistribution, observations]
+    CompanyPatterns:
+      type: object
+      properties:
+        companyId: { type: integer }
+        companyName: { type: string }
+        participationCount: { type: integer }
+        wins: { type: integer }
+        losses: { type: integer }
+        winRate: { type: number }
+        averageBidDistance: { type: ["number", "null"] }
+        medianBidDistance: { type: ["number", "null"] }
+        comparableTenderCount: { type: integer }
+        repeatedParticipantGroups: { type: integer }
+        winnerTransitions:
+          type: array
+          items: { type: string }
+        bidDistanceHistory:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        rotationIndicators:
+          type: array
+          items: { $ref: "#/components/schemas/RotationListItem" }
+        coverBidIndicators:
+          type: array
+          items: { $ref: "#/components/schemas/CoverBidListItem" }
+        priceClusteringIndicators:
+          type: array
+          items: { $ref: "#/components/schemas/PriceClusteringListItem" }
+      required: [companyId, companyName, participationCount, wins, losses, winRate, averageBidDistance, medianBidDistance, comparableTenderCount, repeatedParticipantGroups, winnerTransitions, bidDistanceHistory, rotationIndicators, coverBidIndicators]
+    ScreeningAnalyticsSummary:
+      type: object
+      properties:
+        tendersAnalyzed: { type: integer }
+        rotationIndicators: { type: integer }
+        coverBidIndicators: { type: integer }
+        priceClusteringIndicators: { type: integer }
+        companiesRequiringReview: { type: integer }
+        evidenceRecords: { type: integer }
+        winnerDistribution:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        winnerTransitions:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        bidDistanceDistribution:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        cvDistribution:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+        indicatorsOverTime:
+          type: array
+          items: { $ref: "#/components/schemas/ChartPoint" }
+      required: [tendersAnalyzed, rotationIndicators, coverBidIndicators, priceClusteringIndicators, companiesRequiringReview, evidenceRecords, winnerDistribution, winnerTransitions, bidDistanceDistribution, cvDistribution, indicatorsOverTime]
+    RecalculateInput:
+      type: object
+      properties:
+        tenderIds:
+          type: array
+          items: { type: integer }
+    RecalculateResult:
+      type: object
+      properties:
+        analyzed: { type: integer }
+        skipped: { type: integer }
+        methodologyVersion: { type: string }
+        calculatedAt: { type: string, format: date-time }
+      required: [analyzed, skipped, methodologyVersion, calculatedAt]
+
 

@@ -7,6 +7,7 @@
  */
 import type { ChartPoint } from './chartPoint';
 import type { Investigation } from './investigation';
+import type { ScreeningAnalyticsSummary } from './screeningAnalyticsSummary';
 
 export interface DashboardSummary {
   totalTenders: number;
@@ -18,4 +19,5 @@ export interface DashboardSummary {
   stateCounts: ChartPoint[];
   screeningDistribution: ChartPoint[];
   recentInvestigations: Investigation[];
+  screeningAnalytics: ScreeningAnalyticsSummary;
 }

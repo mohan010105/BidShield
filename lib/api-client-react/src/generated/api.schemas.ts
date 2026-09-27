@@ -50,6 +50,20 @@ export interface Investigation {
   status: InvestigationStatus;
 }
 
+export interface ScreeningAnalyticsSummary {
+  tendersAnalyzed: number;
+  rotationIndicators: number;
+  coverBidIndicators: number;
+  priceClusteringIndicators: number;
+  companiesRequiringReview: number;
+  evidenceRecords: number;
+  winnerDistribution: ChartPoint[];
+  winnerTransitions: ChartPoint[];
+  bidDistanceDistribution: ChartPoint[];
+  cvDistribution: ChartPoint[];
+  indicatorsOverTime: ChartPoint[];
+}
+
 export interface DashboardSummary {
   totalTenders: number;
   totalCompanies: number;
@@ -60,6 +74,7 @@ export interface DashboardSummary {
   stateCounts: ChartPoint[];
   screeningDistribution: ChartPoint[];
   recentInvestigations: Investigation[];
+  screeningAnalytics: ScreeningAnalyticsSummary;
 }
 
 export interface Tender {
@@ -353,6 +368,204 @@ export interface ImportResult {
   errors: number;
   companiesResolved: number;
   companiesCreated: number;
+}
+
+export interface IndicatorMetric {
+  key: string;
+  label: string;
+  value: number;
+  formatted: string;
+}
+
+export interface ComparisonScope {
+  category: string;
+  organization: string;
+  department: string;
+  geography: string;
+  valueRange: string;
+  startDate: string;
+  endDate: string;
+  comparableTenderCount: number;
+}
+
+export interface AnalyticsEvidence {
+  id: number;
+  indicatorType: string;
+  description: string;
+  metric: string;
+  /** @nullable */
+  observedValue: string | null;
+  /** @nullable */
+  expectedValue: string | null;
+  confidence: number;
+  severity: string;
+  supportingTenderIds: number[];
+}
+
+export type AnalyticsIndicatorStatus = typeof AnalyticsIndicatorStatus[keyof typeof AnalyticsIndicatorStatus];
+
+
+export const AnalyticsIndicatorStatus = {
+  LOW_INDICATOR: 'LOW INDICATOR',
+  MODERATE_INDICATOR: 'MODERATE INDICATOR',
+  ELEVATED_INDICATOR: 'ELEVATED INDICATOR',
+  HIGH_INDICATOR: 'HIGH INDICATOR',
+  INSUFFICIENT_DATA: 'INSUFFICIENT_DATA',
+} as const;
+
+export interface AnalyticsIndicator {
+  indicatorType: string;
+  /** @nullable */
+  score: number | null;
+  status: AnalyticsIndicatorStatus;
+  methodologyVersion: string;
+  calculatedAt: string;
+  sampleSize: number;
+  threshold: number;
+  confidence: number;
+  summary: string;
+  metrics: IndicatorMetric[];
+  evidenceCount: number;
+}
+
+export interface TenderAnalytics {
+  tenderId: number;
+  tenderNumber: string;
+  comparisonScope: ComparisonScope;
+  winnerRotation: AnalyticsIndicator;
+  coverBid: AnalyticsIndicator;
+  priceClustering: AnalyticsIndicator;
+  participationNetwork?: AnalyticsIndicator;
+  neatLoss?: AnalyticsIndicator;
+  evidence: AnalyticsEvidence[];
+  calculatedAt: string;
+}
+
+export interface RotationListItem {
+  tenderId: number;
+  tenderNumber: string;
+  /** @nullable */
+  score: number | null;
+  status: string;
+  sampleSize: number;
+  /** @nullable */
+  winner: string | null;
+  comparisonGroup: string;
+  winnerSequence: string[];
+}
+
+export interface RotationList {
+  items: RotationListItem[];
+  total: number;
+}
+
+export interface CoverBidListItem {
+  tenderId: number;
+  tenderNumber: string;
+  /** @nullable */
+  score: number | null;
+  status: string;
+  sampleSize: number;
+  comparisonGroup: string;
+  flaggedCompanies: string[];
+  medianRelativeDistance: number;
+  currentRelativeDistances: number[];
+}
+
+export interface CoverBidList {
+  items: CoverBidListItem[];
+  total: number;
+}
+
+export interface PriceClusteringListItem {
+  tenderId: number;
+  tenderNumber: string;
+  /** @nullable */
+  score: number | null;
+  status: string;
+  sampleSize: number;
+  comparisonGroup: string;
+  coefficientOfVariation: number;
+  bidSpreadPct: number;
+  /** @nullable */
+  cvPercentile: number | null;
+  /** @nullable */
+  historicalMedianCV: number | null;
+  comparableTendersCount: number;
+}
+
+export interface PriceClusteringList {
+  items: PriceClusteringListItem[];
+  total: number;
+}
+
+export interface CompanyPricePatternObservation {
+  tenderId: number;
+  tenderNumber: string;
+  tenderDate: string;
+  category: string;
+  bidAmount: number;
+  winningBid: number;
+  relativeDistancePct: number;
+  isWinner: boolean;
+  isRepeatedPosition: boolean;
+}
+
+export type CompanyPricePatternsBidPositionHistoryItem = {
+  label: string;
+  value: number;
+  bidAmount: number;
+  winningBid: number;
+  isWinner: boolean;
+};
+
+export interface CompanyPricePatterns {
+  companyId: number;
+  companyName: string;
+  comparableBidsCount: number;
+  winningBidsCount: number;
+  losingBidsCount: number;
+  /** @nullable */
+  averageRelativeDistance: number | null;
+  /** @nullable */
+  medianRelativeDistance: number | null;
+  /** @nullable */
+  stdDevRelativeDistance: number | null;
+  repeatedPositioningCount: number;
+  bidPositionHistory: CompanyPricePatternsBidPositionHistoryItem[];
+  positioningDistribution: ChartPoint[];
+  observations: CompanyPricePatternObservation[];
+}
+
+export interface CompanyPatterns {
+  companyId: number;
+  companyName: string;
+  participationCount: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  /** @nullable */
+  averageBidDistance: number | null;
+  /** @nullable */
+  medianBidDistance: number | null;
+  comparableTenderCount: number;
+  repeatedParticipantGroups: number;
+  winnerTransitions: string[];
+  bidDistanceHistory: ChartPoint[];
+  rotationIndicators: RotationListItem[];
+  coverBidIndicators: CoverBidListItem[];
+  priceClusteringIndicators?: PriceClusteringListItem[];
+}
+
+export interface RecalculateInput {
+  tenderIds?: number[];
+}
+
+export interface RecalculateResult {
+  analyzed: number;
+  skipped: number;
+  methodologyVersion: string;
+  calculatedAt: string;
 }
 
 /**

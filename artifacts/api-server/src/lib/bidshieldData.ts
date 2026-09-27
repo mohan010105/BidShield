@@ -1,5 +1,6 @@
 import {
   bidsTable,
+  checkDatabaseConnection,
   companiesTable,
   db,
   evidenceTable,
@@ -10,6 +11,12 @@ import {
   tendersTable,
 } from "@workspace/db";
 import { asc, count, eq } from "drizzle-orm";
+import {
+  normalizeCompany as entityNormalizeCompany,
+  normalizeCompanyName as entityNormalizeName,
+  normalizeAddress as entityNormalizeAddr,
+} from "../entity-resolution/normalizer.js";
+import { scoreMatch } from "../entity-resolution/matcher.js";
 
 export type ScreeningLevel = "Low" | "Moderate" | "Elevated" | "Not yet analyzed";
 
@@ -84,22 +91,11 @@ const companyRoots = [
 const normalizeSpaces = (value: string) => value.trim().replace(/\s+/g, " ");
 
 export function normalizeCompanyName(value: string): string {
-  return normalizeSpaces(value)
-    .toLowerCase()
-    .replace(/[.,/\\-]/g, " ")
-    .replace(/\b(private limited|private ltd|pvt limited|pvt ltd|limited|ltd|llp|incorporated|inc|corporation|company)\b/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return entityNormalizeName(value);
 }
 
 export function normalizeAddress(value: string): string {
-  return normalizeSpaces(value)
-    .toLowerCase()
-    .replace(/[.,/\\-]/g, " ")
-    .replace(/\broad\b/g, "rd")
-    .replace(/\bstreet\b/g, "st")
-    .replace(/\s+/g, " ")
-    .trim();
+  return entityNormalizeAddr(value);
 }
 
 export function parseBidAmount(value: string): number | null {
@@ -317,15 +313,55 @@ export function resolveEntities(rows: Array<Record<string, unknown>>) {
   for (const row of rows) {
     const sourceName = String(row.companyNameOriginal ?? row.companyName ?? "").trim();
     if (!sourceName || matches.has(sourceName)) continue;
-    const normalized = normalizeCompanyName(sourceName);
-    const exact = companies.find((company) => company.normalizedName === normalized);
-    const candidate = exact ?? companies.find((company) => normalized.length > 4 && (company.normalizedName.includes(normalized) || normalized.includes(company.normalizedName)));
-    const nameSimilarity = exact ? 100 : candidate ? 88 : normalized.length > 10 ? 64 : 42;
-    const status = exact ? "AUTO_MATCHED" : candidate && nameSimilarity >= 85 ? "REVIEW_REQUIRED" : "UNRESOLVED";
-    matches.set(sourceName, { id: matches.size + 1, sourceName, suggestedCompany: candidate?.canonicalName ?? null, confidence: nameSimilarity, status, nameSimilarity, addressSimilarity: null, source: "upload" });
+
+    const gstin = String(row.gstin ?? row.gstinOriginal ?? "").trim() || null;
+    const reg = String(row.registrationNumber ?? row.cin ?? "").trim() || null;
+    const address = String(row.address ?? row.location ?? "").trim() || null;
+    const city = String(row.city ?? row.location ?? "").trim() || null;
+    const state = String(row.state ?? "").trim() || null;
+
+    const normSource = entityNormalizeCompany(sourceName, { gstin, registrationNumber: reg, address, city, state });
+
+    let bestCandidate: DemoCompany | null = null;
+    let bestScore = -1;
+    let bestOutcome = "NO_MATCH";
+    let bestNameSim = 0;
+    let bestAddrSim: number | null = null;
+
+    for (const c of companies) {
+      const normCand = entityNormalizeCompany(c.canonicalName, { address: c.address, state: c.state });
+      const scoreRes = scoreMatch(normSource, normCand);
+      if (scoreRes.score > bestScore) {
+        bestScore = scoreRes.score;
+        bestCandidate = c;
+        bestOutcome = scoreRes.outcome;
+        bestNameSim = scoreRes.signals.nameSimilarity;
+        bestAddrSim = scoreRes.signals.addressSimilarity;
+      }
+    }
+
+    let status: "AUTO_MATCHED" | "REVIEW_REQUIRED" | "UNRESOLVED" = "UNRESOLVED";
+    if (bestOutcome === "AUTO_MATCH") status = "AUTO_MATCHED";
+    else if (bestOutcome === "REVIEW_REQUIRED") status = "REVIEW_REQUIRED";
+
+    matches.set(sourceName, {
+      id: matches.size + 1,
+      sourceName,
+      suggestedCompany: bestCandidate?.canonicalName ?? null,
+      confidence: Math.max(0, bestScore),
+      status,
+      nameSimilarity: bestNameSim,
+      addressSimilarity: bestAddrSim,
+      source: "upload",
+    });
   }
   const list = [...matches.values()];
-  return { matches: list, resolvedCount: list.filter((match) => match.status === "AUTO_MATCHED").length, reviewCount: list.filter((match) => match.status === "REVIEW_REQUIRED").length, unresolvedCount: list.filter((match) => match.status === "UNRESOLVED").length };
+  return {
+    matches: list,
+    resolvedCount: list.filter((match) => match.status === "AUTO_MATCHED").length,
+    reviewCount: list.filter((match) => match.status === "REVIEW_REQUIRED").length,
+    unresolvedCount: list.filter((match) => match.status === "UNRESOLVED").length,
+  };
 }
 
 export const companies: DemoCompany[] = companyRoots.map((root, index) => ({
@@ -335,30 +371,142 @@ export const companies: DemoCompany[] = companyRoots.map((root, index) => ({
   address: `${10 + index}, ${states[index % states.length]} Industrial Estate`,
   state: states[index % states.length],
   aliases: index < 3 ? [`${root.toUpperCase()} ${index % 2 ? "TECHNOLOGIES PVT LTD" : "INFRASTRUCTURE LTD"}`] : [],
-  tendersParticipated: 18 + (index * 7) % 44,
-  wins: 3 + (index * 5) % 18,
-  coParticipants: 4 + (index * 3) % 22,
-  screeningLevel: index % 11 === 0 ? "Elevated" : index % 4 === 0 ? "Moderate" : "Low",
+  tendersParticipated: 0,
+  wins: 0,
+  coParticipants: 0,
+  screeningLevel: "Low" as ScreeningLevel,
 }));
+
+/**
+ * SYNTHETIC DEMO DATA — Tender Generation
+ *
+ * This dataset is synthetic and created only for demonstration/testing.
+ * It does not represent real companies, tenders, or procurement events.
+ *
+ * Pattern groups embedded in the data:
+ *  A) Normal competitive tenders (indices 0-39)
+ *  B) Winner rotation cluster (indices 40-54): 3 companies take turns winning
+ *  C) Price clustering group (indices 55-69): very tight bid spreads (<2%)
+ *  D) Repeated participant network (indices 70-84): same 5-company group appears
+ *  E) Cover-bid / neat-loss patterns (indices 85-99): one bidder always just above winner
+ */
+
+// Define synthetic pattern groups
+const ROTATION_COMPANIES = [0, 1, 2]; // Company IDs 1,2,3 rotate wins
+const CLUSTER_COMPANIES = [10, 11, 12, 13]; // Tight pricing group
+const NETWORK_GROUP = [20, 21, 22, 23, 24]; // Always appear together
+const COVER_BID_COMPANIES = [30, 31, 32, 33]; // Cover-bid patterns
+
+// Seeded PRNG for deterministic but varied results
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
+}
 
 export const tenders: DemoTender[] = Array.from({ length: 100 }, (_, index) => {
   const month = String((index % 12) + 1).padStart(2, "0");
-  const day = String((index % 24) + 1).padStart(2, "0");
+  const day = String(((index * 3) % 24) + 1).padStart(2, "0");
   const tenderDate = `2025-${month}-${day}`;
   const category = categories[index % categories.length];
-  const estimatedValue = 1200000 + ((index * 731000) % 14500000);
-  const bidderIds = [index % companies.length, (index * 3 + 7) % companies.length, (index * 5 + 13) % companies.length, (index * 7 + 19) % companies.length];
-  const winnerIndex = index % 9 === 0 ? bidderIds[1] : bidderIds[0];
+  const estimatedValue = 1500000 + Math.round(seededRandom(index * 17) * 13000000);
+
+  let bidderIds: number[];
+  let winnerIndex: number;
+
+  if (index >= 40 && index < 55) {
+    // GROUP B: Winner rotation — 3 companies rotate wins sequentially
+    const rotIdx = (index - 40) % 3;
+    bidderIds = [...ROTATION_COMPANIES, (index * 2 + 5) % companies.length];
+    // Remove duplicates
+    bidderIds = [...new Set(bidderIds)].slice(0, 4);
+    winnerIndex = bidderIds[rotIdx];
+  } else if (index >= 55 && index < 70) {
+    // GROUP C: Price clustering — very tight bid spreads
+    bidderIds = [...CLUSTER_COMPANIES];
+    winnerIndex = bidderIds[0]; // First company always wins
+  } else if (index >= 70 && index < 85) {
+    // GROUP D: Repeated participant network — same group always appears together
+    bidderIds = [...NETWORK_GROUP].slice(0, 4 + (index % 2));
+    winnerIndex = bidderIds[index % bidderIds.length];
+  } else if (index >= 85 && index < 100) {
+    // GROUP E: Cover-bid / neat-loss — one company always narrowly loses
+    bidderIds = [...COVER_BID_COMPANIES];
+    winnerIndex = bidderIds[0]; // Company 31 always wins
+  } else {
+    // GROUP A: Normal competitive bidding
+    bidderIds = [
+      index % companies.length,
+      (index * 3 + 7) % companies.length,
+      (index * 5 + 13) % companies.length,
+      (index * 7 + 19) % companies.length,
+    ];
+    bidderIds = [...new Set(bidderIds)].slice(0, 4);
+    // Vary winner among different bidders
+    winnerIndex = bidderIds[Math.floor(seededRandom(index * 31) * bidderIds.length)];
+  }
+
   const bids = bidderIds.map((companyIndex, bidIndex) => {
-    const bid = estimatedValue * (1 - bidIndex * 0.025 + ((index + bidIndex) % 4) * 0.006);
-    return { companyId: companyIndex + 1, companyName: companies[companyIndex].canonicalName, bidAmount: Math.round(bid), rank: bidIndex + 1, isWinner: companyIndex === winnerIndex, differenceFromWinner: 0 };
+    let bidAmount: number;
+
+    if (index >= 55 && index < 70) {
+      // Price clustering: all bids within 1.5% of estimated value
+      const spread = 0.003 * (bidIndex + 1) + seededRandom(index * 100 + bidIndex) * 0.005;
+      bidAmount = estimatedValue * (0.96 + spread);
+    } else if (index >= 85 && index < 100) {
+      // Cover-bid: losing bids are just 0.5-2% above winner
+      if (companyIndex === winnerIndex) {
+        bidAmount = estimatedValue * (0.92 + seededRandom(index * 7) * 0.04);
+      } else {
+        const margin = 0.005 + seededRandom(index * 100 + bidIndex) * 0.015;
+        bidAmount = estimatedValue * (0.92 + seededRandom(index * 7) * 0.04) * (1 + margin);
+      }
+    } else {
+      // Normal: varied spread (5-20%)
+      const baseDiscount = 0.05 + seededRandom(index * 11 + bidIndex * 37) * 0.15;
+      bidAmount = estimatedValue * (1 - baseDiscount + bidIndex * 0.03);
+    }
+
+    return {
+      companyId: companyIndex + 1,
+      companyName: companies[companyIndex].canonicalName,
+      bidAmount: Math.round(bidAmount),
+      rank: bidIndex + 1,
+      isWinner: companyIndex === winnerIndex,
+      differenceFromWinner: 0,
+    };
   });
-  const winningBid = bids.find((bid) => bid.isWinner)?.bidAmount ?? bids[0].bidAmount;
-  bids.forEach((bid) => { bid.differenceFromWinner = Math.max(0, bid.bidAmount - winningBid); });
-  const screeningLevel: ScreeningLevel = index % 13 === 0 ? "Elevated" : index % 5 === 0 ? "Moderate" : "Low";
+
+  // Sort bids by amount ascending and assign ranks
+  bids.sort((a, b) => a.bidAmount - b.bidAmount);
+  bids.forEach((bid, i) => { bid.rank = i + 1; });
+
+  // Ensure the winner has the lowest bid (L1)
+  const winnerBid = bids.find(b => b.isWinner);
+  if (winnerBid && winnerBid.rank !== 1) {
+    // Swap: make winner's bid the lowest
+    const lowestBid = bids[0];
+    const winnerAmount = winnerBid.bidAmount;
+    winnerBid.bidAmount = lowestBid.bidAmount;
+    lowestBid.bidAmount = winnerAmount;
+    bids.sort((a, b) => a.bidAmount - b.bidAmount);
+    bids.forEach((bid, i) => { bid.rank = i + 1; });
+  }
+
+  const winningBidAmount = bids.find(b => b.isWinner)?.bidAmount ?? bids[0].bidAmount;
+  bids.forEach(bid => { bid.differenceFromWinner = Math.max(0, bid.bidAmount - winningBidAmount); });
+
+  // Update company statistics
+  bidderIds.forEach(cid => {
+    if (companies[cid]) {
+      companies[cid].tendersParticipated++;
+      if (cid === winnerIndex) companies[cid].wins++;
+    }
+  });
+
+  // Screening level will be determined by the analytics engine, set "Not yet analyzed" initially
   return {
     id: index + 1,
-    tenderNumber: `BS-${2025}-${String(index + 1).padStart(4, "0")}`,
+    tenderNumber: `TND-DEMO-${String(index + 1).padStart(3, "0")}`,
     title: `${category} procurement package ${index + 1}`,
     organization: organizations[index % organizations.length],
     department: departments[index % departments.length],
@@ -368,36 +516,95 @@ export const tenders: DemoTender[] = Array.from({ length: 100 }, (_, index) => {
     tenderDate,
     closingDate: `2025-${month}-${String(Math.min(28, Number(day) + 10)).padStart(2, "0")}`,
     estimatedValue,
-    contractValue: Math.round(winningBid),
+    contractValue: Math.round(winningBidAmount),
     bidderCount: bids.length,
     winner: companies[winnerIndex].canonicalName,
-    screeningLevel,
-    indicatorCount: screeningLevel === "Elevated" ? 3 : screeningLevel === "Moderate" ? 1 : 0,
+    screeningLevel: "Not yet analyzed" as ScreeningLevel,
+    indicatorCount: 0,
     bids,
   };
 });
 
-export const investigations: DemoInvestigation[] = tenders.filter((tender) => tender.screeningLevel !== "Low").slice(0, 12).map((tender, index) => ({
-  id: index + 1,
-  tenderId: tender.id,
-  tenderNumber: tender.tenderNumber,
-  title: tender.title,
-  screeningLevel: tender.screeningLevel,
-  indicatorCount: tender.indicatorCount,
-  lastAnalyzed: `2025-${String((index % 9) + 1).padStart(2, "0")}-18T10:00:00.000Z`,
-  status: index % 3 === 0 ? "New" : index % 3 === 1 ? "Under Review" : "Reviewed",
-}));
+// Update co-participant counts
+companies.forEach((company, idx) => {
+  const coParticipantSet = new Set<number>();
+  tenders.forEach(t => {
+    if (t.bids.some(b => b.companyId === idx + 1)) {
+      t.bids.forEach(b => { if (b.companyId !== idx + 1) coParticipantSet.add(b.companyId); });
+    }
+  });
+  company.coParticipants = coParticipantSet.size;
+});
+
+export const investigations: DemoInvestigation[] = [];
+
+/** Demo dataset metadata */
+export const DEMO_DATASET_INFO = {
+  name: "BidShield Synthetic Demo Dataset",
+  version: "1.0.0",
+  source: "synthetic-demo",
+  purpose: "Demonstration and testing of BidShield analytical pipeline",
+  disclaimer: "This synthetic dataset is designed to demonstrate BidShield's analytical workflow. It does not represent actual procurement activity or allegations against real organizations.",
+  totalCompanies: companies.length,
+  totalTenders: tenders.length,
+  totalBids: tenders.reduce((sum, t) => sum + t.bids.length, 0),
+  patternGroups: [
+    { name: "Normal Competitive", range: "TND-DEMO-001 to TND-DEMO-040", count: 40 },
+    { name: "Winner Rotation Pattern", range: "TND-DEMO-041 to TND-DEMO-055", count: 15 },
+    { name: "Price Clustering Pattern", range: "TND-DEMO-056 to TND-DEMO-070", count: 15 },
+    { name: "Repeated Network Pattern", range: "TND-DEMO-071 to TND-DEMO-085", count: 15 },
+    { name: "Cover-Bid / Neat-Loss Pattern", range: "TND-DEMO-086 to TND-DEMO-100", count: 15 },
+  ],
+};
+
+let demoSeeded = false;
+let demoAnalyticsRun = false;
+
+export function getDemoStatus() {
+  return {
+    seeded: demoSeeded,
+    analyticsRun: demoAnalyticsRun,
+    dataset: DEMO_DATASET_INFO,
+    companiesCount: companies.length,
+    tendersCount: tenders.length,
+    bidsCount: tenders.reduce((sum, t) => sum + t.bids.length, 0),
+    investigationsCount: investigations.length,
+  };
+}
 
 export async function ensureDemoDatabase(): Promise<void> {
+  if (demoSeeded) {
+    if (!demoAnalyticsRun) {
+      await runDemoAnalytics().catch(() => {});
+    }
+    return;
+  }
+
   try {
-    const [companyCount, tenderCount] = await Promise.all([
-      db.select({ value: count() }).from(companiesTable),
-      db.select({ value: count() }).from(tendersTable),
-    ]);
-    if (Number(tenderCount[0]?.value ?? 0) > 0) return;
+    const [tenderCount] = await db.select({ value: count() }).from(tendersTable);
+    if (Number(tenderCount?.value ?? 0) > 0) {
+      demoSeeded = true;
+      return;
+    }
+
+    // 1. Create demo import batch
+    const [batch] = await db.insert(importBatchesTable).values({
+      filename: "bidshield-synthetic-demo-v1.0.csv",
+      source: "synthetic-demo",
+      totalRows: tenders.reduce((sum, t) => sum + t.bids.length, 0),
+      validRows: tenders.reduce((sum, t) => sum + t.bids.length, 0),
+      warningRows: 0,
+      errorRows: 0,
+      status: "Imported",
+      qualityScore: "98",
+    }).returning();
+    const batchId = batch?.id ?? null;
+
+    // 2. Insert companies
     let storedCompanies = await db.select({ id: companiesTable.id, normalizedName: companiesTable.normalizedName }).from(companiesTable).orderBy(asc(companiesTable.id));
-    if (Number(companyCount[0]?.value ?? 0) === 0) {
-      storedCompanies = await db.insert(companiesTable).values(companies.map((company) => ({
+    const [companyCount] = await db.select({ value: count() }).from(companiesTable);
+    if (Number(companyCount?.value ?? 0) === 0) {
+      storedCompanies = await db.insert(companiesTable).values(companies.map(company => ({
         canonicalName: company.canonicalName,
         normalizedName: company.normalizedName,
         address: company.address,
@@ -405,9 +612,11 @@ export async function ensureDemoDatabase(): Promise<void> {
         state: company.state,
       }))).returning({ id: companiesTable.id, normalizedName: companiesTable.normalizedName });
     }
-    const companyIds = new Map(storedCompanies.map((company) => [company.normalizedName, company.id]));
-    const companyIdFor = (companyId: number) => companyIds.get(companies[companyId - 1].normalizedName) ?? companyId;
-    const storedTenders = await db.insert(tendersTable).values(tenders.map((tender) => ({
+    const companyIds = new Map(storedCompanies.map(c => [c.normalizedName, c.id]));
+    const companyIdFor = (companyId: number) => companyIds.get(companies[companyId - 1]?.normalizedName) ?? companyId;
+
+    // 3. Insert tenders
+    const storedTenders = await db.insert(tendersTable).values(tenders.map(tender => ({
       tenderNumber: tender.tenderNumber,
       title: tender.title,
       department: tender.department,
@@ -419,11 +628,13 @@ export async function ensureDemoDatabase(): Promise<void> {
       closingDate: tender.closingDate,
       estimatedValue: String(tender.estimatedValue),
       contractValue: tender.contractValue === null ? null : String(tender.contractValue),
-      winnerId: tender.winner ? companyIdFor(companies.find((company) => company.canonicalName === tender.winner)?.id ?? 1) : null,
+      winnerId: tender.winner ? companyIdFor(companies.find(c => c.canonicalName === tender.winner)?.id ?? 1) : null,
       status: "Completed",
       source: "synthetic-demo",
     }))).returning({ id: tendersTable.id });
-    const bidRows = tenders.flatMap((tender, tenderIndex) => tender.bids.map((bid) => ({
+
+    // 4. Insert bids
+    const bidRows = tenders.flatMap((tender, tenderIndex) => tender.bids.map(bid => ({
       tenderId: storedTenders[tenderIndex].id,
       companyId: companyIdFor(bid.companyId),
       bidAmount: String(bid.bidAmount),
@@ -433,32 +644,87 @@ export async function ensureDemoDatabase(): Promise<void> {
       sourceRowId: `demo-${tender.id}-${bid.companyId}`,
       originalCompanyName: bid.companyName,
       normalizedCompanyName: normalizeCompanyName(bid.companyName),
+      importBatchId: batchId,
     })));
     await db.insert(bidsTable).values(bidRows);
-    await db.insert(tenderParticipantsTable).values(bidRows.map((bid) => ({ tenderId: bid.tenderId, companyId: bid.companyId, participated: true })));
-    const storedRiskScores = await db.insert(riskScoresTable).values(tenders.filter((tender) => tender.screeningLevel !== "Low").map((tender) => ({
-      tenderId: storedTenders[tender.id - 1].id,
-      overallScore: tender.screeningLevel === "Elevated" ? "72" : "48",
-      riskLevel: tender.screeningLevel,
-    }))).returning({ id: riskScoresTable.id, tenderId: riskScoresTable.tenderId });
-    await db.insert(evidenceTable).values(storedRiskScores.map((risk) => ({
-      riskScoreId: risk.id,
-      indicatorType: "Observed participation pattern",
-      description: "Synthetic demo evidence placeholder for future screening engines.",
-      metric: "Participation history",
-      observedValue: "Demo value",
-      expectedValue: "Context dependent",
-      confidence: "0.5",
-      severity: "Informational",
+
+    // 5. Insert tender participants
+    await db.insert(tenderParticipantsTable).values(bidRows.map(bid => ({
+      tenderId: bid.tenderId,
+      companyId: bid.companyId,
+      participated: true,
     })));
-    await db.insert(investigationReportsTable).values(investigations.map((investigation) => ({
-      tenderId: storedTenders[investigation.tenderId - 1].id,
-      screeningLevel: investigation.screeningLevel,
-      generatedSummary: "Synthetic demo investigation record. This is not a finding of wrongdoing.",
-    })));
+
+    demoSeeded = true;
+    if (!demoAnalyticsRun) {
+      await runDemoAnalytics().catch(() => {});
+    }
+
+    // NOTE: Risk scores and evidence are NOT inserted here.
+    // They will be calculated by the analytics engine via runDemoAnalytics().
+    // This ensures all screening results flow through the production pipeline.
   } catch {
     // The API still serves the synthetic demo store if a local database is not yet pushed.
   }
+}
+
+/**
+ * Runs the full BidShield screening pipeline against the demo dataset.
+ * Called after seeding, or when the user clicks "Run Screening".
+ * Updates in-memory tender screening levels from engine-calculated results.
+ */
+export async function runDemoAnalytics(): Promise<{ analyzed: number; flagged: number }> {
+  // Lazy import to avoid circular dependency
+  const { analyticsService } = await import("../analytics/index.js");
+  const result = await analyticsService.recalculateCombinedRisk();
+
+  // Update in-memory tender screening levels from analytics results
+  for (const tender of tenders) {
+    const analytics = await analyticsService.getTenderAnalytics(tender.id);
+    if (analytics?.combinedRisk) {
+      const score = analytics.combinedRisk.overallScore ?? 0;
+      tender.screeningLevel = score >= 60 ? "Elevated" : score >= 35 ? "Moderate" : "Low";
+      tender.indicatorCount = analytics.combinedRisk.availableIndicatorCount ?? 0;
+    }
+  }
+
+  // Rebuild investigations from flagged tenders
+  investigations.length = 0;
+  const flaggedTenders = tenders.filter(t => t.screeningLevel !== "Low");
+  flaggedTenders.slice(0, 20).forEach((tender, index) => {
+    investigations.push({
+      id: index + 1,
+      tenderId: tender.id,
+      tenderNumber: tender.tenderNumber,
+      title: tender.title,
+      screeningLevel: tender.screeningLevel,
+      indicatorCount: tender.indicatorCount,
+      lastAnalyzed: new Date().toISOString(),
+      status: index % 3 === 0 ? "New" : index % 3 === 1 ? "Under Review" : "Reviewed",
+    });
+  });
+
+  // Update company screening levels
+  const companyScores = new Map<number, number[]>();
+  for (const tender of tenders) {
+    const analytics = await analyticsService.getTenderAnalytics(tender.id);
+    if (analytics?.combinedRisk?.overallScore) {
+      for (const bid of tender.bids) {
+        if (!companyScores.has(bid.companyId)) companyScores.set(bid.companyId, []);
+        companyScores.get(bid.companyId)!.push(analytics.combinedRisk.overallScore);
+      }
+    }
+  }
+  for (const [companyId, scores] of companyScores) {
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const company = companies.find(c => c.id === companyId);
+    if (company) {
+      company.screeningLevel = avg >= 60 ? "Elevated" : avg >= 35 ? "Moderate" : "Low";
+    }
+  }
+
+  demoAnalyticsRun = true;
+  return { analyzed: result.analyzed, flagged: result.elevatedSignalsCount };
 }
 
 export async function createImportBatch(filename: string, report: { rows: number; validRows: number; warningRows: number; errorRows: number; qualityScore: number }) {
@@ -476,4 +742,232 @@ export async function createImportBatch(filename: string, report: { rows: number
   } catch {
     return null;
   }
+}
+
+export async function persistAndProcessImportedCsv(
+  filename: string,
+  rows: Array<Record<string, unknown>>,
+  report: { rows: number; validRows: number; warningRows: number; errorRows: number; qualityScore: number }
+) {
+  const isDbAvailable = await checkDatabaseConnection();
+  let batchId: number | null = null;
+  if (isDbAvailable) {
+    batchId = await createImportBatch(filename, report);
+  }
+
+  const newTenderIds: number[] = [];
+  const processedCompanies = new Set<string>();
+
+  const validRows = rows.filter((row) => {
+    const tenderNum = String(row.tenderNumber ?? row.tenderNumberOriginal ?? "").trim();
+    const compName = String(row.companyName ?? row.companyNameOriginal ?? "").trim();
+    const amount = typeof row.bidAmount === "number" ? row.bidAmount : parseBidAmount(String(row.bidAmountOriginal ?? ""));
+    return Boolean(tenderNum && compName && amount && amount > 0);
+  });
+
+  const tendersMap = new Map<string, Array<Record<string, unknown>>>();
+  for (const row of validRows) {
+    const tenderNum = String(row.tenderNumber ?? row.tenderNumberOriginal ?? "").trim();
+    if (!tendersMap.has(tenderNum)) {
+      tendersMap.set(tenderNum, []);
+    }
+    tendersMap.get(tenderNum)!.push(row);
+  }
+
+  for (const [tenderNum, tenderBids] of tendersMap.entries()) {
+    const parsedBids = tenderBids.map((row) => {
+      const canonical = String(row.companyNameOriginal ?? row.companyName ?? "Unknown Vendor").trim();
+      const normalized = normalizeCompanyName(canonical);
+      const amount = typeof row.bidAmount === "number" ? row.bidAmount : (parseBidAmount(String(row.bidAmountOriginal ?? "")) || 0);
+      const isWinner = Boolean(row.isWinner);
+      const sourceRowId = String(row.sourceRowId ?? "");
+      return { row, canonical, normalized, amount, isWinner, sourceRowId };
+    }).sort((a, b) => a.amount - b.amount);
+
+    const winningIndex = parsedBids.findIndex((b) => b.isWinner);
+    const effectiveWinnerIdx = winningIndex >= 0 ? winningIndex : 0;
+    parsedBids.forEach((b, idx) => {
+      b.isWinner = idx === effectiveWinnerIdx;
+    });
+
+    const winningBidAmount = parsedBids[effectiveWinnerIdx]?.amount || parsedBids[0]?.amount || 0;
+    const firstRow = parsedBids[0]?.row || {};
+
+    const category = String(firstRow.category || "General Works");
+    const organization = String(firstRow.organization || "Public Procurement Authority");
+    const department = String(firstRow.department || "Procurement Directorate");
+    const location = String(firstRow.location || "Central District");
+    const state = String(firstRow.state || "National");
+    const tenderDate = String(firstRow.tenderDate || new Date().toISOString().slice(0, 10));
+    const closingDate = String(firstRow.closingDate || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10));
+    const title = String(firstRow.tenderTitle || firstRow.title || `${category} Package ${tenderNum}`);
+    const estimatedValue = Number(firstRow.estimatedValue) || Math.round(winningBidAmount * 1.05);
+
+    const companyIdMap = new Map<string, number>();
+    for (const b of parsedBids) {
+      // 1. Check known aliases and canonical mappings via entity resolution service
+      let matchedCandidate = await entityResolutionService.findCanonicalForName(b.canonical);
+      let comp = matchedCandidate ? companies.find((c) => c.id === matchedCandidate!.companyId) : null;
+
+      // 2. If not found via direct alias, check normalized match in companies list
+      if (!comp) {
+        comp = companies.find((c) => c.normalizedName === b.normalized || c.canonicalName.toLowerCase() === b.canonical.toLowerCase());
+      }
+
+      // 3. If still not found, check via entity resolution
+      if (!comp) {
+        const matchRecord = await entityResolutionService.resolveSingleRecord(b.canonical, {
+          address: `${location}, ${state} Industrial Area`,
+          city: location,
+          state,
+          source: "CSV import",
+        });
+
+        if (matchRecord.status === "AUTO_MATCHED" && matchRecord.candidateCompanyId) {
+          comp = companies.find((c) => c.id === matchRecord.candidateCompanyId) || null;
+          if (comp) {
+            await entityResolutionService.addAlias(comp.id, b.canonical, "auto_import", matchRecord.confidence, "CSV import");
+          }
+        }
+      }
+
+      if (!comp) {
+        const newCompId = companies.length + 1;
+        comp = {
+          id: newCompId,
+          canonicalName: b.canonical,
+          normalizedName: b.normalized,
+          address: `${location}, ${state} Industrial Area`,
+          state,
+          aliases: [b.canonical, b.canonical.toUpperCase()],
+          tendersParticipated: 1,
+          wins: b.isWinner ? 1 : 0,
+          coParticipants: parsedBids.length - 1,
+          screeningLevel: "Low",
+        };
+        companies.push(comp);
+
+        if (isDbAvailable) {
+          try {
+            const [inserted] = await db.insert(companiesTable).values({
+              canonicalName: comp.canonicalName,
+              normalizedName: comp.normalizedName,
+              address: comp.address,
+              normalizedAddress: normalizeAddress(comp.address),
+              state: comp.state,
+            }).returning({ id: companiesTable.id });
+            if (inserted?.id) {
+              comp.id = inserted.id;
+            }
+          } catch {
+            // Graceful fallback
+          }
+        }
+
+        await entityResolutionService.addAlias(comp.id, b.canonical, "canonical", 100, "CSV import");
+      } else {
+        comp.tendersParticipated += 1;
+        if (b.isWinner) comp.wins += 1;
+      }
+      companyIdMap.set(b.normalized, comp.id);
+      processedCompanies.add(comp.normalizedName);
+    }
+
+    const demoBids: DemoBid[] = parsedBids.map((b, idx) => ({
+      companyId: companyIdMap.get(b.normalized) || (idx + 1),
+      companyName: b.canonical,
+      bidAmount: b.amount,
+      rank: idx + 1,
+      isWinner: b.isWinner,
+      differenceFromWinner: Math.max(0, b.amount - winningBidAmount),
+    }));
+
+    let existingTender = tenders.find((t) => t.tenderNumber === tenderNum);
+    let tenderId: number;
+
+    if (existingTender) {
+      existingTender.bids = demoBids;
+      existingTender.bidderCount = demoBids.length;
+      existingTender.contractValue = Math.round(winningBidAmount);
+      existingTender.winner = parsedBids[effectiveWinnerIdx]?.canonical || null;
+      tenderId = existingTender.id;
+    } else {
+      tenderId = tenders.length + 1;
+      const newTender: DemoTender = {
+        id: tenderId,
+        tenderNumber: tenderNum,
+        title,
+        organization,
+        department,
+        category,
+        location,
+        state,
+        tenderDate,
+        closingDate,
+        estimatedValue,
+        contractValue: Math.round(winningBidAmount),
+        bidderCount: demoBids.length,
+        winner: parsedBids[effectiveWinnerIdx]?.canonical || null,
+        screeningLevel: "Low",
+        indicatorCount: 0,
+        bids: demoBids,
+      };
+      tenders.push(newTender);
+      newTenderIds.push(tenderId);
+
+      if (isDbAvailable) {
+        try {
+          const [insertedTender] = await db.insert(tendersTable).values({
+            tenderNumber: newTender.tenderNumber,
+            title: newTender.title,
+            department: newTender.department,
+            organization: newTender.organization,
+            category: newTender.category,
+            location: newTender.location,
+            state: newTender.state,
+            tenderDate: newTender.tenderDate,
+            closingDate: newTender.closingDate,
+            estimatedValue: String(newTender.estimatedValue),
+            contractValue: String(newTender.contractValue),
+            winnerId: companyIdMap.get(parsedBids[effectiveWinnerIdx]?.normalized || ""),
+            status: "Completed",
+            source: "CSV upload",
+          }).returning({ id: tendersTable.id });
+
+          const dbTenderId = insertedTender?.id ?? tenderId;
+
+          await db.insert(bidsTable).values(
+            demoBids.map((b) => ({
+              tenderId: dbTenderId,
+              companyId: b.companyId,
+              bidAmount: String(b.bidAmount),
+              bidRank: b.rank,
+              isWinner: b.isWinner,
+              submissionDate: tenderDate,
+              sourceRowId: `csv-${dbTenderId}-${b.companyId}`,
+              originalCompanyName: b.companyName,
+              normalizedCompanyName: normalizeCompanyName(b.companyName),
+              importBatchId: batchId,
+            }))
+          );
+
+          await db.insert(tenderParticipantsTable).values(
+            demoBids.map((b) => ({
+              tenderId: dbTenderId,
+              companyId: b.companyId,
+              participated: true,
+            }))
+          );
+        } catch {
+          // Graceful fallback
+        }
+      }
+    }
+  }
+
+  return {
+    batchId,
+    newTenderIds,
+    processedCompaniesCount: processedCompanies.size,
+  };
 }

@@ -1,0 +1,1135 @@
+Build **Phase 3** of the existing **BidShield** application for:
+
+**PS-09-S1 — Detecting Bid Rigging in Public Procurement**
+
+Phase 1 and Phase 2 have already been implemented.
+
+**DO NOT rebuild the application.**
+Inspect and extend the existing codebase.
+
+Phase 3 introduces the first real procurement-screening intelligence.
+
+Implement:
+
+1. Winner Rotation Screening
+2. Cover-Bid / Suspicious Bid-Position Screening
+3. Evidence generation for both
+4. Tender-level screening indicators
+5. Company/group-level historical indicators
+6. Visualization of the results
+7. Initial screening-score infrastructure
+
+Do NOT implement the remaining three screens yet:
+
+* Price clustering
+* Participation network risk
+* "Too neat" losing-bid analysis
+
+Those will be implemented in later phases.
+
+---
+
+# 1. CORE PRINCIPLE
+
+BidShield is a statistical screening system.
+
+It does NOT determine that collusion, bid rigging, fraud, corruption, or wrongdoing occurred.
+
+Every result must be phrased as:
+
+* "Statistical indicator"
+* "Potentially unusual pattern"
+* "Requires further review"
+* "Observed bidding pattern"
+
+Never use:
+
+* "Collusion detected"
+* "Fraud detected"
+* "Corrupt company"
+* "Confirmed bid rigging"
+* "Criminal bidder"
+
+The application must display:
+
+> "Statistical screening identifies patterns that may warrant further review. It does not establish collusion, wrongdoing, or legal liability."
+
+This should appear on relevant screening pages and investigation pages.
+
+---
+
+# 2. FIRST INSPECT EXISTING PHASES
+
+Before writing code:
+
+1. Inspect Phase 1 architecture.
+2. Inspect Phase 2 ingestion pipeline.
+3. Inspect PostgreSQL schema.
+4. Inspect normalized procurement records.
+5. Inspect company entity-resolution implementation.
+6. Inspect existing API structure.
+7. Inspect existing dashboard.
+8. Inspect existing tender details page.
+9. Inspect existing investigation pages.
+10. Identify reusable components.
+
+Do NOT duplicate existing functionality.
+
+If Phase 1 or Phase 2 has errors, fix them before implementing Phase 3.
+
+---
+
+# 3. DATA MODEL ASSUMPTIONS
+
+Use the existing normalized data.
+
+The primary entities are:
+
+Company
+Tender
+Bid
+Tender Participant
+Company Alias
+Import Batch
+
+A tender can have multiple bidders.
+
+A company can participate in many tenders.
+
+A company can win some tenders and lose others.
+
+Use canonical company IDs, NOT raw bidder-name strings.
+
+This is critical because Phase 2 resolved entity aliases.
+
+---
+
+# 4. ANALYTICS ARCHITECTURE
+
+Create a modular analytics architecture:
+
+analytics/
+├── screens/
+│   ├── winner_rotation/
+│   │   ├── detector.py
+│   │   ├── metrics.py
+│   │   └── evidence.py
+│   │
+│   └── cover_bid/
+│       ├── detector.py
+│       ├── metrics.py
+│       └── evidence.py
+│
+├── common/
+│   ├── statistics.py
+│   └── helpers.py
+│
+└── scoring/
+└── indicators.py
+
+Keep detection logic separate from API logic.
+
+Do NOT put statistical calculations directly inside Express route handlers.
+
+---
+
+# 5. WINNER ROTATION SCREEN
+
+Implement a winner-rotation screening engine.
+
+The purpose is to identify unusually structured patterns in which a recurring group of bidders appears across comparable tenders and different members repeatedly win.
+
+IMPORTANT:
+
+Do not assume that repeated winners automatically imply coordination.
+
+Legitimate factors such as capability, geography, specialization, pricing, or qualification can produce repeated patterns.
+
+The detector should identify patterns for review.
+
+---
+
+# 6. WINNER ROTATION — DATA PREPARATION
+
+Group tenders by relevant comparison dimensions where available:
+
+* organization
+* department
+* category
+* location
+* procurement type
+* time period
+
+Do not compare unrelated tenders blindly.
+
+For each group:
+
+1. identify participating companies
+2. identify winner
+3. order tenders chronologically
+4. create winner sequences
+
+Example:
+
+Tender A → Company 1
+Tender B → Company 2
+Tender C → Company 3
+Tender D → Company 1
+Tender E → Company 2
+
+This is a pattern that may warrant investigation.
+
+---
+
+# 7. WINNER ROTATION METRICS
+
+Implement measurable metrics rather than a hardcoded "rotation detected" flag.
+
+Possible metrics:
+
+### Winner concentration
+
+Measure how concentrated wins are among participating firms.
+
+### Winner transition pattern
+
+Analyze transitions:
+
+A → B
+B → C
+C → A
+
+### Alternation frequency
+
+Measure how often a small recurring group takes turns winning.
+
+### Repeated participant set
+
+Measure how frequently the same group of companies participates together.
+
+### Sequence regularity
+
+Measure whether winner sequences exhibit unusual regularity relative to an appropriate baseline.
+
+Do not claim that a particular statistical threshold proves collusion.
+
+---
+
+# 8. ROTATION SCORE
+
+Create an initial normalized indicator:
+
+`rotation_score`
+
+Range:
+
+0–100
+
+Higher values indicate stronger statistical indicators of structured winner patterns.
+
+The score must be explainable.
+
+Do NOT simply generate random scores.
+
+Store the underlying metrics.
+
+Example:
+
+rotation_score:
+78
+
+Supporting metrics:
+
+winner_concentration:
+0.72
+
+alternation_frequency:
+0.81
+
+repeated_group_rate:
+0.76
+
+sequence_regularity:
+0.69
+
+The exact weighting should be documented in code and README.
+
+Make weights configurable.
+
+---
+
+# 9. WINNER ROTATION EVIDENCE
+
+For every flagged tender/group, generate evidence.
+
+Example:
+
+> "Within the selected comparison group, 4 companies participated in 17 tenders. Wins alternated among the same group across 11 of those tenders."
+
+Another:
+
+> "The current tender belongs to a group where the same set of bidders has repeatedly appeared together."
+
+Do not say:
+
+> "These companies are colluding."
+
+Evidence must be based on actual calculated metrics.
+
+Store evidence in the existing `evidence` table.
+
+Use:
+
+indicator_type:
+
+`WINNER_ROTATION`
+
+---
+
+# 10. COVER-BID SCREENING
+
+Implement a statistical screen for bids that appear unusually positioned relative to the winning bid.
+
+The goal is to identify suspiciously structured bid relationships for further review.
+
+Do not assume every higher losing bid is a cover bid.
+
+---
+
+# 11. COVER-BID METRICS
+
+For each tender:
+
+Calculate:
+
+### Relative bid distance
+
+For each losing bid:
+
+`(losing_bid - winning_bid) / winning_bid`
+
+### Bid spread
+
+Measure the spread among submitted bids.
+
+### Losing-bid position
+
+Analyze how losing bidders are positioned relative to the winner.
+
+### Historical bidder behavior
+
+Compare a company's bid positioning across comparable tenders.
+
+### Repeated proximity pattern
+
+Identify bidders that repeatedly submit bids at similar relative distances from the winner.
+
+---
+
+# 12. COVER-BID SCREENING EXAMPLE
+
+Suppose:
+
+Winner:
+
+₹10,00,000
+
+Other bids:
+
+₹10,80,000
+₹10,82,000
+₹10,85,000
+
+Calculate:
+
+8.0%
+8.2%
+8.5%
+
+If similar positioning occurs repeatedly for the same bidders across comparable tenders, increase the screening indicator.
+
+Do not use a single tender as sufficient evidence.
+
+Historical repetition should matter.
+
+---
+
+# 13. COVER-BID SCORE
+
+Create:
+
+`cover_bid_score`
+
+Range:
+
+0–100
+
+It should consider:
+
+* relative bid distance
+* consistency
+* historical repetition
+* bidder-specific behavior
+* comparable tender behavior
+
+Document the methodology.
+
+Do not use unexplained arbitrary scoring.
+
+---
+
+# 14. COVER-BID EVIDENCE
+
+Example:
+
+> "Company B submitted a bid 8.1% above the winning bid in 7 comparable tenders. Its median relative distance from the winner in this category is 8.0%."
+
+This is evidence.
+
+Do NOT write:
+
+> "Company B submitted cover bids."
+
+Instead:
+
+> "Company B shows a repeated bid-positioning pattern that warrants review."
+
+Store:
+
+indicator_type:
+
+`COVER_BID`
+
+---
+
+# 15. COMPARABLE TENDERS
+
+A major requirement is to avoid comparing unrelated procurement.
+
+Build a reusable comparison function.
+
+Compare using available fields such as:
+
+* category
+* organization
+* department
+* geography
+* tender value range
+* procurement type
+* time period
+
+Create a configurable similarity mechanism.
+
+Example:
+
+Tender A:
+
+Category = Electrical Equipment
+State = Tamil Nadu
+Organization = X
+Estimated Value = ₹50L
+
+should be compared more heavily with similar tenders than with:
+
+Category = Road Construction
+State = Gujarat
+Estimated Value = ₹15Cr
+
+Document the comparison logic.
+
+---
+
+# 16. HISTORICAL ANALYSIS
+
+Both screens should use historical procurement data.
+
+For each company:
+
+Track:
+
+* participation count
+* wins
+* losses
+* winning percentage
+* average bid distance
+* median bid distance
+* number of comparable tenders
+* repeated participant groups
+
+For each bidder group:
+
+Track:
+
+* number of shared tenders
+* shared winners
+* winner transitions
+* repeated participation
+
+This information will later feed the network and overall risk engine.
+
+---
+
+# 17. DATABASE CHANGES
+
+Extend the existing schema where required.
+
+Create a screening-results table if one does not already exist:
+
+`screener_results`
+
+Fields:
+
+* id
+* tender_id
+* company_id
+* indicator_type
+* score
+* status
+* methodology_version
+* calculated_at
+
+Example:
+
+indicator_type:
+
+`WINNER_ROTATION`
+
+score:
+
+78
+
+status:
+
+`REVIEW`
+
+methodology_version:
+
+`v1.0`
+
+Use the existing `risk_scores` and `evidence` tables where appropriate.
+
+Do not duplicate information unnecessarily.
+
+---
+
+# 18. EVIDENCE TABLE
+
+Ensure evidence records contain:
+
+* risk/screening result ID
+* indicator type
+* description
+* metric
+* observed value
+* expected/reference value
+* confidence
+* severity
+* supporting tender IDs if practical
+
+Evidence should always be traceable to the underlying data.
+
+---
+
+# 19. API ENDPOINTS
+
+Add endpoints such as:
+
+POST /api/analytics/tenders/:id/analyze
+
+GET /api/analytics/tenders/:id
+
+GET /api/analytics/tenders/:id/evidence
+
+GET /api/analytics/rotation
+
+GET /api/analytics/rotation/:companyId
+
+GET /api/analytics/cover-bid
+
+GET /api/analytics/companies/:id/patterns
+
+POST /api/analytics/recalculate
+
+Use the existing Express architecture.
+
+Return consistent responses:
+
+{
+"success": true,
+"data": {}
+}
+
+Errors:
+
+{
+"success": false,
+"error": {
+"message": "..."
+}
+}
+
+---
+
+# 20. ANALYSIS WORKFLOW
+
+Implement:
+
+Clean Procurement Data
+↓
+Select Comparable Tender Group
+↓
+Winner Rotation Analysis
+↓
+Cover-Bid Analysis
+↓
+Calculate Indicators
+↓
+Generate Evidence
+↓
+Store Results
+↓
+Expose Through API
+↓
+Display In Dashboard
+
+---
+
+# 21. TENDER DETAILS PAGE
+
+Upgrade the existing tender details page.
+
+Add:
+
+## Screening Summary
+
+Display:
+
+Winner Rotation
+[score / status]
+
+Cover-Bid Pattern
+[score / status]
+
+Do NOT display "fraud probability."
+
+Example:
+
+Winner Rotation
+78 / 100
+Elevated indicator
+
+Cover-Bid Pattern
+65 / 100
+Review suggested
+
+---
+
+# 22. EVIDENCE PANEL
+
+For each indicator show:
+
+### Winner Rotation
+
+Status:
+Elevated indicator
+
+Evidence:
+
+* 17 comparable tenders
+* 4 recurring bidders
+* 11 tenders show alternating winners
+* current tender belongs to this recurring group
+
+### Cover-Bid
+
+Status:
+Review suggested
+
+Evidence:
+
+* 8 comparable tenders
+* Bidder B's median distance from winner: 8.2%
+* Current tender distance: 8.4%
+* repeated pattern observed in 6 tenders
+
+Every number must come from actual data.
+
+---
+
+# 23. SCREENING DETAILS MODAL/PAGE
+
+Create a "View Analysis" button.
+
+When clicked:
+
+Show:
+
+* methodology
+* metrics
+* formulas
+* comparison population
+* number of tenders analyzed
+* time period
+* score calculation
+* evidence
+
+Example:
+
+ANALYSIS SCOPE
+
+Comparable tenders:
+27
+
+Period:
+January 2025 – August 2026
+
+Category:
+Electrical Equipment
+
+Organization:
+Department X
+
+This makes the system auditable.
+
+---
+
+# 24. DASHBOARD UPDATES
+
+Add:
+
+### Screening Indicators
+
+* Tenders analyzed
+* Tenders with rotation indicators
+* Tenders with cover-bid indicators
+* Companies requiring review
+* Evidence records generated
+
+Charts:
+
+* Winner distribution
+* Winner transitions
+* Bid-distance distribution
+* Screening indicators over time
+
+Do not label these as "fraud cases."
+
+---
+
+# 25. WINNER ROTATION VISUALIZATION
+
+Create a timeline.
+
+Example:
+
+```text
+Tender 01 → Company A
+Tender 02 → Company B
+Tender 03 → Company C
+Tender 04 → Company A
+Tender 05 → Company B
+```
+
+Display:
+
+* tender date
+* winner
+* participating companies
+* contract value
+
+Highlight repeated winner transitions.
+
+This is a descriptive visualization.
+
+---
+
+# 26. BID POSITION VISUALIZATION
+
+Create a chart:
+
+X-axis:
+
+Bidder
+
+Y-axis:
+
+Relative difference from winning bid
+
+Example:
+
+Winner: 0%
+
+Bidder B: +7.8%
+
+Bidder C: +8.2%
+
+Bidder D: +8.6%
+
+Allow users to inspect historical comparable tenders.
+
+---
+
+# 27. COMPANY PROFILE UPDATE
+
+Upgrade:
+
+`/companies/:id`
+
+Add:
+
+### Winner History
+
+* total wins
+* win rate
+* recent wins
+* winner transitions
+
+### Bid Positioning
+
+* average relative bid distance
+* median relative bid distance
+* historical distribution
+
+### Comparable Tender Participation
+
+* total comparable tenders
+* recurring participants
+
+Do not generate a company "guilt score."
+
+Only display statistical indicators.
+
+---
+
+# 28. SCREENING THRESHOLDS
+
+Make thresholds configurable.
+
+Create a configuration such as:
+
+rotation_review_threshold
+cover_bid_review_threshold
+
+Do not hardcode thresholds throughout the codebase.
+
+Document the thresholds.
+
+Use labels:
+
+LOW INDICATOR
+
+MODERATE INDICATOR
+
+ELEVATED INDICATOR
+
+HIGH INDICATOR
+
+These describe screening intensity, not wrongdoing.
+
+---
+
+# 29. METHODOLOGY PAGE
+
+Create:
+
+`/methodology`
+
+Explain:
+
+### Winner Rotation
+
+What is measured.
+
+### Cover-Bid Screening
+
+What is measured.
+
+### Comparable Tenders
+
+How comparison groups are constructed.
+
+### Scores
+
+How scores are calculated.
+
+### Limitations
+
+Include:
+
+* Statistical patterns can have legitimate explanations.
+* Data quality affects results.
+* Entity-resolution errors can affect analysis.
+* Screening does not establish collusion.
+* Results require independent investigation.
+
+This page is important for the hackathon because the problem statement explicitly requires careful framing.
+
+---
+
+# 30. FALSE-POSITIVE PROTECTION
+
+Build contextual warnings.
+
+For example:
+
+If only 2 comparable tenders exist:
+
+> "Limited comparison data. This indicator should not be interpreted without additional evidence."
+
+If a company has only 1 historical tender:
+
+> "Insufficient historical observations."
+
+If entity resolution confidence is low:
+
+> "Entity matching uncertainty may affect this result."
+
+Do not generate strong screening signals from insufficient data.
+
+---
+
+# 31. MINIMUM SAMPLE REQUIREMENTS
+
+Introduce configurable minimum sample sizes.
+
+For example:
+
+Winner rotation analysis:
+
+Require an appropriate minimum number of comparable tenders before calculating a meaningful historical pattern.
+
+Cover-bid historical analysis:
+
+Require multiple comparable observations before making a repeated-pattern assessment.
+
+If insufficient:
+
+Return:
+
+`INSUFFICIENT_DATA`
+
+rather than a fabricated score.
+
+---
+
+# 32. TESTING
+
+Create unit tests for:
+
+### Winner rotation
+
+Test:
+
+A → B → C → A → B → C
+
+and compare with:
+
+A → A → A → B → A
+
+Ensure the metrics distinguish different patterns.
+
+### Cover bid
+
+Test bid arrays such as:
+
+1000000
+1080000
+1082000
+1085000
+
+Calculate relative distances correctly.
+
+### Insufficient data
+
+Test that too few tenders produce:
+
+`INSUFFICIENT_DATA`
+
+rather than a misleading score.
+
+### Comparable tenders
+
+Test that unrelated categories/regions are not accidentally treated as identical comparison groups.
+
+### Evidence
+
+Every evidence statement must reference real calculated metrics.
+
+---
+
+# 33. ANALYTICAL TRANSPARENCY
+
+For every score:
+
+Store:
+
+* methodology version
+* input population
+* metrics
+* threshold configuration
+* calculation timestamp
+
+The user should be able to understand how the score was produced.
+
+Do not use an opaque ML model for Phase 3.
+
+Use deterministic statistical screening first.
+
+This will make the system easier to validate and demonstrate.
+
+---
+
+# 34. PERFORMANCE
+
+The analysis should work with thousands of bids.
+
+Avoid recalculating the entire database when a single tender is opened.
+
+Use:
+
+* cached screening results
+* database indexes
+* batch analysis
+* precomputed comparable groups where appropriate
+
+Create:
+
+POST `/api/analytics/recalculate`
+
+for full recalculation.
+
+Allow individual tender analysis separately.
+
+---
+
+# 35. UI LANGUAGE
+
+Use:
+
+"Screening"
+
+"Indicator"
+
+"Observed pattern"
+
+"Evidence"
+
+"Requires review"
+
+"Insufficient data"
+
+"Comparison group"
+
+Never:
+
+"Confirmed"
+
+"Guilty"
+
+"Fraud"
+
+"Corrupt"
+
+"Colluding"
+
+"Criminal"
+
+---
+
+# 36. DO NOT IMPLEMENT YET
+
+Do NOT implement:
+
+❌ Price clustering engine
+
+❌ Participation network risk engine
+
+❌ Neat-loss / "too neat" losing-bid engine
+
+❌ Final combined risk score
+
+❌ LLM-generated investigative conclusions
+
+❌ Automated accusations
+
+Those belong to later phases.
+
+Phase 3 must focus on making the first two screens reliable and explainable.
+
+---
+
+# 37. PHASE 3 DEFINITION OF DONE
+
+Phase 3 is complete only when:
+
+✓ Phase 1 still works
+
+✓ Phase 2 still works
+
+✓ Clean procurement data is consumed correctly
+
+✓ Winner rotation engine works
+
+✓ Cover-bid screening engine works
+
+✓ Comparable tender groups are used
+
+✓ Historical patterns are calculated
+
+✓ Scores are deterministic and explainable
+
+✓ Insufficient data is handled safely
+
+✓ Evidence is generated
+
+✓ Evidence is stored
+
+✓ Methodology is documented
+
+✓ Tender details show screening indicators
+
+✓ Company details show historical indicators
+
+✓ Winner timeline works
+
+✓ Bid-position chart works
+
+✓ Dashboard shows screening statistics
+
+✓ API endpoints work
+
+✓ Tests pass
+
+✓ No major TypeScript/runtime errors remain
+
+✓ No hardcoded secrets exist
+
+✓ No unsupported claims are displayed
+
+✓ README is updated
+
+---
+
+# 38. FINAL RESPONSE AFTER IMPLEMENTATION
+
+After completing Phase 3, report:
+
+1. Existing Phase 1/2 functionality preserved
+2. Files created/modified
+3. Database changes
+4. Winner-rotation methodology
+5. Cover-bid methodology
+6. Metrics implemented
+7. Threshold configuration
+8. API endpoints
+9. UI changes
+10. Tests executed
+11. Test results
+12. Known limitations
+13. Any remaining errors
+14. How to demonstrate Phase 3
+15. Recommended Phase 4 implementation
+
+Do not claim that the system detects actual collusion.
+
+The Phase 3 output should be an **auditable statistical screening system**, not an accusation engine.

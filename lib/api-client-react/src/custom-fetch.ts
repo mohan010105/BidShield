@@ -358,6 +358,39 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  const resolvedUrl = resolveUrl(input);
+
+  const globalEnv = (globalThis as any).process?.env || {};
+  const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env || {} : {};
+
+  const analyticsKey =
+    metaEnv.VITE_ANALYTICS_API_KEY ||
+    globalEnv.ANALYTICS_API_KEY ||
+    "JAFZD1XpgLIvLPULX1Q4G56o7A67NjMsQMCKCvtH";
+
+  const entityKey =
+    metaEnv.VITE_ENTITY_RESOLUTION_KEY ||
+    globalEnv.ENTITY_RESOLUTION_SERVICE_KEY ||
+    "ZsazUckgZlrZqUqoWlt1Wwvf0WQbyUTQ";
+
+  if (resolvedUrl.includes("/analytics") && !headers.has("x-analytics-api-key") && !headers.has("x-api-key")) {
+    if (analyticsKey) {
+      headers.set("x-analytics-api-key", analyticsKey);
+      headers.set("x-api-key", analyticsKey);
+    }
+  }
+
+  if (
+    (resolvedUrl.includes("/resolve-entities") || resolvedUrl.includes("/entities")) &&
+    !headers.has("x-entity-resolution-key") &&
+    !headers.has("x-api-key")
+  ) {
+    if (entityKey) {
+      headers.set("x-entity-resolution-key", entityKey);
+      headers.set("x-api-key", entityKey);
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

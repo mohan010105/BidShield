@@ -50,7 +50,35 @@ export const GetDashboardSummaryResponse = zod.object({
   "indicatorCount": zod.number().int(),
   "lastAnalyzed": zod.coerce.date().nullish(),
   "status": zod.enum(['New', 'Under Review', 'Reviewed'])
+})),
+  "screeningAnalytics": zod.object({
+  "tendersAnalyzed": zod.number().int(),
+  "rotationIndicators": zod.number().int(),
+  "coverBidIndicators": zod.number().int(),
+  "priceClusteringIndicators": zod.number().int(),
+  "companiesRequiringReview": zod.number().int(),
+  "evidenceRecords": zod.number().int(),
+  "winnerDistribution": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
+})),
+  "winnerTransitions": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
+})),
+  "bidDistanceDistribution": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
+})),
+  "cvDistribution": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
+})),
+  "indicatorsOverTime": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
 }))
+})
 })
 
 
@@ -339,6 +367,456 @@ export const GetNetworkResponse = zod.object({
   "target": zod.number().int(),
   "sharedTenderCount": zod.number().int()
 }))
+})
+
+
+/**
+ * @summary Analyze one tender with the enabled screening engines
+ */
+export const AnalyzeTenderParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const AnalyzeTenderResponse = zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "comparisonScope": zod.object({
+  "category": zod.string(),
+  "organization": zod.string(),
+  "department": zod.string(),
+  "geography": zod.string(),
+  "valueRange": zod.string(),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "comparableTenderCount": zod.number().int()
+}),
+  "winnerRotation": zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+}),
+  "coverBid": zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+}),
+  "priceClustering": zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+}),
+  "evidence": zod.array(zod.object({
+  "id": zod.number().int(),
+  "indicatorType": zod.string(),
+  "description": zod.string(),
+  "metric": zod.string(),
+  "observedValue": zod.string().nullable(),
+  "expectedValue": zod.string().nullable(),
+  "confidence": zod.number(),
+  "severity": zod.string(),
+  "supportingTenderIds": zod.array(zod.number().int())
+})),
+  "calculatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get cached or calculated tender analytics
+ */
+export const GetTenderAnalyticsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetTenderAnalyticsResponse = zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "comparisonScope": zod.object({
+  "category": zod.string(),
+  "organization": zod.string(),
+  "department": zod.string(),
+  "geography": zod.string(),
+  "valueRange": zod.string(),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "comparableTenderCount": zod.number().int()
+}),
+  "winnerRotation": zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+}),
+  "coverBid": zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+}),
+  "priceClustering": zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+}),
+  "evidence": zod.array(zod.object({
+  "id": zod.number().int(),
+  "indicatorType": zod.string(),
+  "description": zod.string(),
+  "metric": zod.string(),
+  "observedValue": zod.string().nullable(),
+  "expectedValue": zod.string().nullable(),
+  "confidence": zod.number(),
+  "severity": zod.string(),
+  "supportingTenderIds": zod.array(zod.number().int())
+})),
+  "calculatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get traceable screening evidence for a tender
+ */
+export const GetTenderAnalyticsEvidenceParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetTenderAnalyticsEvidenceResponseItem = zod.object({
+  "id": zod.number().int(),
+  "indicatorType": zod.string(),
+  "description": zod.string(),
+  "metric": zod.string(),
+  "observedValue": zod.string().nullable(),
+  "expectedValue": zod.string().nullable(),
+  "confidence": zod.number(),
+  "severity": zod.string(),
+  "supportingTenderIds": zod.array(zod.number().int())
+})
+export const GetTenderAnalyticsEvidenceResponse = zod.array(GetTenderAnalyticsEvidenceResponseItem)
+
+
+/**
+ * @summary List winner rotation indicators
+ */
+export const GetRotationAnalyticsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "winner": zod.string().nullable(),
+  "comparisonGroup": zod.string(),
+  "winnerSequence": zod.array(zod.string())
+})),
+  "total": zod.number().int()
+})
+
+
+/**
+ * @summary Get winner rotation history for a company
+ */
+export const GetCompanyRotationAnalyticsParams = zod.object({
+  "companyId": zod.coerce.number().int()
+})
+
+export const GetCompanyRotationAnalyticsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "winner": zod.string().nullable(),
+  "comparisonGroup": zod.string(),
+  "winnerSequence": zod.array(zod.string())
+})),
+  "total": zod.number().int()
+})
+
+
+/**
+ * @summary List cover-bid positioning indicators
+ */
+export const GetCoverBidAnalyticsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "comparisonGroup": zod.string(),
+  "flaggedCompanies": zod.array(zod.string()),
+  "medianRelativeDistance": zod.number(),
+  "currentRelativeDistances": zod.array(zod.number())
+})),
+  "total": zod.number().int()
+})
+
+
+/**
+ * @summary List price clustering indicators
+ */
+export const GetPriceClusteringAnalyticsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "comparisonGroup": zod.string(),
+  "coefficientOfVariation": zod.number(),
+  "bidSpreadPct": zod.number(),
+  "cvPercentile": zod.number().nullable(),
+  "historicalMedianCV": zod.number().nullable(),
+  "comparableTendersCount": zod.number().int()
+})),
+  "total": zod.number().int()
+})
+
+
+/**
+ * @summary Run price clustering screening on a tender
+ */
+export const AnalyzeTenderPriceClusteringParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const AnalyzeTenderPriceClusteringResponse = zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+})
+
+
+/**
+ * @summary Get price clustering screening indicator for a tender
+ */
+export const GetTenderPriceClusteringParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetTenderPriceClusteringResponse = zod.object({
+  "indicatorType": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.enum(['LOW INDICATOR', 'MODERATE INDICATOR', 'ELEVATED INDICATOR', 'HIGH INDICATOR', 'INSUFFICIENT_DATA']),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date(),
+  "sampleSize": zod.number().int(),
+  "threshold": zod.number(),
+  "confidence": zod.number(),
+  "summary": zod.string(),
+  "metrics": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "value": zod.number(),
+  "formatted": zod.string()
+})),
+  "evidenceCount": zod.number().int()
+})
+
+
+/**
+ * @summary Get historical screening patterns for a company
+ */
+export const GetCompanyPatternsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetCompanyPatternsResponse = zod.object({
+  "companyId": zod.number().int(),
+  "companyName": zod.string(),
+  "participationCount": zod.number().int(),
+  "wins": zod.number().int(),
+  "losses": zod.number().int(),
+  "winRate": zod.number(),
+  "averageBidDistance": zod.number().nullable(),
+  "medianBidDistance": zod.number().nullable(),
+  "comparableTenderCount": zod.number().int(),
+  "repeatedParticipantGroups": zod.number().int(),
+  "winnerTransitions": zod.array(zod.string()),
+  "bidDistanceHistory": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
+})),
+  "rotationIndicators": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "winner": zod.string().nullable(),
+  "comparisonGroup": zod.string(),
+  "winnerSequence": zod.array(zod.string())
+})),
+  "coverBidIndicators": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "comparisonGroup": zod.string(),
+  "flaggedCompanies": zod.array(zod.string()),
+  "medianRelativeDistance": zod.number(),
+  "currentRelativeDistances": zod.array(zod.number())
+})),
+  "priceClusteringIndicators": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "score": zod.number().nullable(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "comparisonGroup": zod.string(),
+  "coefficientOfVariation": zod.number(),
+  "bidSpreadPct": zod.number(),
+  "cvPercentile": zod.number().nullable(),
+  "historicalMedianCV": zod.number().nullable(),
+  "comparableTendersCount": zod.number().int()
+})).optional()
+})
+
+
+/**
+ * @summary Get historical price positioning patterns for a company
+ */
+export const GetCompanyPricePatternsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetCompanyPricePatternsResponse = zod.object({
+  "companyId": zod.number().int(),
+  "companyName": zod.string(),
+  "comparableBidsCount": zod.number().int(),
+  "winningBidsCount": zod.number().int(),
+  "losingBidsCount": zod.number().int(),
+  "averageRelativeDistance": zod.number().nullable(),
+  "medianRelativeDistance": zod.number().nullable(),
+  "stdDevRelativeDistance": zod.number().nullable(),
+  "repeatedPositioningCount": zod.number().int(),
+  "bidPositionHistory": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "bidAmount": zod.number(),
+  "winningBid": zod.number(),
+  "isWinner": zod.boolean()
+})),
+  "positioningDistribution": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number()
+})),
+  "observations": zod.array(zod.object({
+  "tenderId": zod.number().int(),
+  "tenderNumber": zod.string(),
+  "tenderDate": zod.string(),
+  "category": zod.string(),
+  "bidAmount": zod.number(),
+  "winningBid": zod.number(),
+  "relativeDistancePct": zod.number(),
+  "isWinner": zod.boolean(),
+  "isRepeatedPosition": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Recalculate enabled screening indicators
+ */
+export const RecalculateAnalyticsBody = zod.object({
+  "tenderIds": zod.array(zod.number().int()).optional()
+})
+
+export const RecalculateAnalyticsResponse = zod.object({
+  "analyzed": zod.number().int(),
+  "skipped": zod.number().int(),
+  "methodologyVersion": zod.string(),
+  "calculatedAt": zod.coerce.date()
 })
 
 
